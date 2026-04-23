@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import "reactflow/dist/style.css";
+@import "vis-timeline/styles/vis-timeline-graph2d.css";
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background-color: #f4f1ea;
+  color: #1a1a1a;
+}
