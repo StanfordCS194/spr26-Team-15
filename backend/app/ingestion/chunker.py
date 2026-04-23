@@ -19,9 +19,9 @@ class Chunk:
 
 def chunk_text(
     text: str,
-    target_chars: int = 4000,
-    overlap_chars: int = 200,
-    hard_max: int = 8000,
+    target_chars: int = 1500,
+    overlap_chars: int = 100,
+    hard_max: int = 3000,
 ) -> list[Chunk]:
     """Chunk `text` into windows of ~target_chars, trying to break on paragraph boundaries.
 

@@ -68,6 +68,7 @@ export function Timeline({ caseId, onEventSelect }: Props) {
         zoomable: true,
         selectable: true,
         margin: { item: 8 },
+        height: "100%",
       });
       timelineRef.current.on("select", (evt: { items: string[] }) => {
         if (evt.items.length > 0) onEventSelect(evt.items[0]);
@@ -85,5 +86,5 @@ export function Timeline({ caseId, onEventSelect }: Props) {
   if (events.length === 0)
     return <div className="p-4 text-sm text-neutral-500">No events yet.</div>;
 
-  return <div ref={containerRef} className="h-full w-full bg-white" />;
+  return <div ref={containerRef} className="h-full w-full overflow-hidden bg-white" />;
 }

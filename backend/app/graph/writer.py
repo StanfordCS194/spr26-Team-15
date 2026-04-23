@@ -11,6 +11,7 @@ Each provenance entry is "doc_id:chunk_id:start-end".
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 from neo4j import Driver
@@ -178,7 +179,7 @@ def upsert_relation(driver: Driver, relation: ResolvedRelation) -> None:
             subject_id=relation.subject_canonical_id,
             object_id=relation.object_canonical_id,
             type=relation.type,
-            qualifiers=relation.qualifiers,
+            qualifiers=json.dumps(relation.qualifiers),
             provenance_str=relation.provenance_str,
         )
 

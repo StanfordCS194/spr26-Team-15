@@ -10,11 +10,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import cases, contradictions, documents, graph
 from app.config import get_settings
+from app.db import init_schema
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    # No-op for now; reserved for connection pool warmup.
+    init_schema()
     yield
 
 

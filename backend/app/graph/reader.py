@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from app.graph.client import get_driver
 
 
@@ -22,6 +24,9 @@ def read_case_graph(case_id: str) -> dict:
             cid=case_id,
         )
         relations = [dict(r) for r in rel_result]
+        for rel in relations:
+            raw = rel.get("qualifiers")
+            rel["qualifiers"] = json.loads(raw) if raw else {}
 
     return {"entities": entities, "relations": relations}
 

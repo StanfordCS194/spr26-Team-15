@@ -1,8 +1,4 @@
-"""Orchestrates the full extraction → resolution → graph → contradictions pipeline for a case.
-
-Runs synchronously for the prototype. If we outgrow this, move per-chunk extraction into
-a worker queue (Celery/Arq); the surface here stays the same.
-"""
+"""Orchestrates the full extraction → resolution → graph → contradictions pipeline for a case."""
 
 from __future__ import annotations
 
@@ -80,33 +76,26 @@ def run_pipeline_for_case(
         rows = cur.fetchall()
 
     for row in rows:
-        doc_id = row["doc_id"]
-        chunk_id = row["chunk_id"]
-        chunk_text = row["chunk_text"]
-        char_offset_in_doc = row["char_start"]
-
-        doc_ids_seen.add(doc_id)
-
+        doc_ids_seen.add(row["doc_id"])
         try:
             outcome = client.extract(
-                chunk_text=chunk_text,
-                source_doc_id=doc_id,
-                chunk_id=chunk_id,
-                char_offset_in_doc=char_offset_in_doc,
+                chunk_text=row["chunk_text"],
+                source_doc_id=row["doc_id"],
+                chunk_id=row["chunk_id"],
+                char_offset_in_doc=row["char_start"],
             )
         except ExtractionValidationError as e:
-            logger.exception("extraction failed for chunk %s: %s", chunk_id, e)
+            logger.exception("extraction failed for chunk %s: %s", row["chunk_id"], e)
             stats.chunks_failed += 1
             continue
 
-        per_chunk_results.append((doc_id, chunk_id, outcome.result))
+        per_chunk_results.append((row["doc_id"], row["chunk_id"], outcome.result))
         stats.chunks_processed += 1
         stats.total_input_tokens += outcome.usage.input_tokens
         stats.total_output_tokens += outcome.usage.output_tokens
         stats.cache_read_input_tokens += outcome.usage.cache_read_input_tokens
         stats.cache_creation_input_tokens += outcome.usage.cache_creation_input_tokens
-
-        _persist_extraction(chunk_id, outcome, stats)
+        _persist_extraction(row["chunk_id"], outcome, stats)
 
     stats.documents_processed = len(doc_ids_seen)
 

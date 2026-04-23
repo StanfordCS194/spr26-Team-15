@@ -94,12 +94,13 @@ def test_validate_references_flags_dangling() -> None:
     assert any("ghost" in e for e in errs)
 
 
-def test_extraction_rejects_extra_fields() -> None:
-    with pytest.raises(ValidationError):
-        Entity(
-            id="e1",
-            type=EntityType.PERSON,
-            mention_text="x",
-            provenance=make_prov(),
-            not_a_field="oops",  # type: ignore[call-arg]
-        )
+def test_extraction_ignores_extra_fields() -> None:
+    # extra="ignore" so LLM output with unexpected fields (common with json_object mode) doesn't crash
+    e = Entity(
+        id="e1",
+        type=EntityType.PERSON,
+        mention_text="x",
+        provenance=make_prov(),
+        not_a_field="oops",  # type: ignore[call-arg]
+    )
+    assert not hasattr(e, "not_a_field")

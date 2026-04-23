@@ -1,16 +1,14 @@
-"""Anthropic client for entity/relation/claim/event extraction.
+"""LLM client for entity/relation/claim/event extraction.
+
+Provider is selected via LLM_PROVIDER in .env (anthropic | groq). See app/llm.py.
 
 Design choices:
-- Uses `client.messages.parse(output_format=ExtractionResult)` for native Pydantic validation.
-  This is more reliable than post-hoc JSON parsing — if the response doesn't match the schema,
-  the SDK raises. We still layer our own semantic validation (dangling references, offsets).
-- Prompt caching is on. System prompt, schema (implicit via output_format), and few-shot
-  examples sit before the last cache_control breakpoint. The per-chunk user message goes after.
-- Retries: SDK handles 429/5xx automatically. We add our own bounded retry for validation
-  failures (dangling entity references, bad offsets).
-- Model: defaults to Sonnet 4.6 per app config. Switchable for cost experimentation.
-
-See claude-api skill (shared/prompt-caching.md, python/claude-api/tool-use.md §Structured Outputs).
+- Each provider's parse() does schema validation natively (Anthropic via messages.parse,
+  Groq via model_validate_json). If the response doesn't match the schema, a Pydantic
+  ValidationError is raised and the repair loop re-prompts once.
+- Prompt caching is on for Anthropic. Groq ignores cache_control silently.
+- Retries: SDK handles 429/5xx automatically. Tenacity adds bounded retries for transient
+  provider errors (APIConnectionError, InternalServerError, RateLimitError).
 """
 
 from __future__ import annotations
@@ -18,31 +16,20 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-import anthropic
-from anthropic import Anthropic
 from pydantic import ValidationError
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
+from tenacity import Retrying, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.config import get_settings
 from app.extraction.prompts import FEW_SHOT_EXAMPLES, SYSTEM_PROMPT, build_user_message
+from app.llm import LLMParseError, LLMUsage, AnthropicProvider, GroqProvider, make_provider
 from app.models.extraction import ExtractionResult
 
 logger = logging.getLogger(__name__)
 
-MAX_OUTPUT_TOKENS = 8000
+MAX_OUTPUT_TOKENS = 2000
 
-
-@dataclass(frozen=True)
-class ExtractionUsage:
-    input_tokens: int
-    output_tokens: int
-    cache_read_input_tokens: int
-    cache_creation_input_tokens: int
+# Alias kept so pipeline.py and tests can import ExtractionUsage from here unchanged.
+ExtractionUsage = LLMUsage
 
 
 @dataclass(frozen=True)
@@ -59,10 +46,25 @@ class ExtractionValidationError(RuntimeError):
 
 
 class ExtractionClient:
-    def __init__(self, client: Anthropic | None = None, model: str | None = None):
+    def __init__(
+        self,
+        client=None,
+        model: str | None = None,
+        provider: AnthropicProvider | GroqProvider | None = None,
+    ) -> None:
         s = get_settings()
-        self._client = client or Anthropic(api_key=s.anthropic_api_key)
-        self._model = model or s.extraction_model
+        if provider is not None:
+            self._provider = provider
+        elif client is not None:
+            # Legacy injection path used by tests: wrap a bare Anthropic client.
+            self._provider = AnthropicProvider(
+                api_key="", model=model or s.extraction_model, _client=client
+            )
+        else:
+            self._provider = make_provider(s)
+            if model:
+                self._provider.model = model
+        self._model = self._provider.model
 
     def extract(
         self,
@@ -71,7 +73,7 @@ class ExtractionClient:
         source_doc_id: str,
         chunk_id: str,
         char_offset_in_doc: int,
-        max_repair_attempts: int = 1,
+        max_repair_attempts: int = 2,
     ) -> ExtractionOutcome:
         """Extract structured facts from a single chunk.
 
@@ -88,7 +90,6 @@ class ExtractionClient:
             try:
                 result, usage = self._call_api(conversation)
             except ValidationError as e:
-                # Schema validation failed. Feed the error back and try again.
                 logger.warning("extraction schema validation failed on attempt %d: %s", attempt, e)
                 if attempt >= max_repair_attempts:
                     raise
@@ -131,48 +132,29 @@ class ExtractionClient:
                 }
             ]
 
-        # Should be unreachable
         raise ExtractionValidationError("extraction failed after all repair attempts")
 
-    @retry(
-        reraise=True,
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=30),
-        retry=retry_if_exception_type(
-            (anthropic.APIConnectionError, anthropic.InternalServerError, anthropic.RateLimitError)
-        ),
-    )
     def _call_api(self, messages: list[dict]) -> tuple[ExtractionResult, ExtractionUsage]:
-        """One API call with SDK-native Pydantic parsing. Tenacity handles transient errors
-        beyond what the SDK's built-in retries cover."""
-        response = self._client.messages.parse(
-            model=self._model,
-            max_tokens=MAX_OUTPUT_TOKENS,
-            system=[
-                {
-                    "type": "text",
-                    "text": SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
-            messages=messages,
-            output_format=ExtractionResult,
-        )
-
-        parsed = response.parsed_output
-        if parsed is None:
-            # Could be a refusal; surface it clearly.
-            raise ExtractionValidationError(
-                f"model returned no parsed output; stop_reason={response.stop_reason}"
+        def _once() -> tuple[ExtractionResult, ExtractionUsage]:
+            try:
+                parsed, usage = self._provider.parse(
+                    messages, SYSTEM_PROMPT, ExtractionResult, MAX_OUTPUT_TOKENS
+                )
+            except LLMParseError as e:
+                raise ExtractionValidationError(str(e)) from e
+            return parsed, ExtractionUsage(
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                cache_read_input_tokens=usage.cache_read_input_tokens,
+                cache_creation_input_tokens=usage.cache_creation_input_tokens,
             )
 
-        usage = ExtractionUsage(
-            input_tokens=response.usage.input_tokens,
-            output_tokens=response.usage.output_tokens,
-            cache_read_input_tokens=getattr(response.usage, "cache_read_input_tokens", 0) or 0,
-            cache_creation_input_tokens=getattr(response.usage, "cache_creation_input_tokens", 0) or 0,
-        )
-        return parsed, usage
+        return Retrying(
+            reraise=True,
+            stop=stop_after_attempt(3),
+            wait=wait_exponential(multiplier=1, min=2, max=30),
+            retry=retry_if_exception_type(self._provider.retry_exceptions),
+        )(_once)
 
     @staticmethod
     def _validate_semantics(

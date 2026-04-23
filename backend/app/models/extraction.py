@@ -6,10 +6,60 @@ so the UI can always highlight the text that supported an extraction.
 
 from __future__ import annotations
 
+import logging
 from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+logger = logging.getLogger(__name__)
+
+# Aliases for values LLMs commonly produce that don't match the schema exactly.
+_RELATION_TYPE_ALIASES: dict[str, str] = {
+    "approved": "signed",
+    "authorized": "signed",
+    "wrote": "signed",
+    "sent": "communicated_with",
+    "emailed": "communicated_with",
+    "contacted": "communicated_with",
+    "messaged": "communicated_with",
+    "owns": "party_to",
+    "partner_of": "party_to",
+    "works_for": "employs",
+    "employed_by": "employs",
+    "hired": "employs",
+    "claimed": "alleged",
+    "asserted": "alleged",
+    "stated": "alleged",
+    "reported": "alleged",
+    "from": "sourced_from",
+    "paid_to": "paid",
+    "participated_in": "attended",
+    "joined": "attended",
+    "happened_on": "occurred_on",
+    "took_place_on": "occurred_on",
+    "located_in": "located_at",
+    "based_in": "located_at",
+}
+
+_VALUE_TYPE_ALIASES: dict[str, str] = {
+    "string": "text",
+    "str": "text",
+    "boolean": "text",
+    "bool": "text",
+    "integer": "number",
+    "int": "number",
+    "float": "number",
+    "decimal": "money",
+    "currency": "money",
+    "dollar": "money",
+    "amount": "money",
+    "reference": "entity_ref",
+    "ref": "entity_ref",
+    "entity": "entity_ref",
+    "timestamp": "date",
+    "datetime": "date",
+}
 
 
 class EntityType(StrEnum):
@@ -57,7 +107,7 @@ class Provenance(BaseModel):
 class Entity(BaseModel):
     """A person, org, date, etc. `mention_text` is verbatim from the source."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     id: str  # local-to-extraction ID assigned by the LLM; canonicalized during resolution
     type: EntityType
@@ -71,7 +121,7 @@ class Entity(BaseModel):
 class Relation(BaseModel):
     """Edge between two entities, with provenance to the span that expresses the relation."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     id: str
     type: RelationType
@@ -81,6 +131,22 @@ class Relation(BaseModel):
     provenance: Provenance
     confidence: float = Field(ge=0.0, le=1.0, default=0.8)
 
+    @field_validator("type", mode="before")
+    @classmethod
+    def _coerce_relation_type(cls, v: object) -> object:
+        if not isinstance(v, str):
+            return v
+        normalized = v.lower().strip()
+        valid = {rt.value for rt in RelationType}
+        if normalized in valid:
+            return normalized
+        if normalized in _RELATION_TYPE_ALIASES:
+            mapped = _RELATION_TYPE_ALIASES[normalized]
+            logger.debug("coerced relation type %r → %r", v, mapped)
+            return mapped
+        logger.warning("unknown relation type %r, falling back to 'alleged'", v)
+        return "alleged"
+
 
 class Claim(BaseModel):
     """An assertion made in a source document about an entity.
@@ -89,7 +155,7 @@ class Claim(BaseModel):
     (subject_entity_id, predicate) but different values conflict.
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     id: str
     subject_entity_id: str
@@ -100,11 +166,27 @@ class Claim(BaseModel):
     provenance: Provenance
     confidence: float = Field(ge=0.0, le=1.0, default=0.8)
 
+    @field_validator("value_type", mode="before")
+    @classmethod
+    def _coerce_value_type(cls, v: object) -> object:
+        if not isinstance(v, str):
+            return v
+        normalized = v.lower().strip()
+        valid = {"text", "date", "money", "entity_ref", "number"}
+        if normalized in valid:
+            return normalized
+        if normalized in _VALUE_TYPE_ALIASES:
+            mapped = _VALUE_TYPE_ALIASES[normalized]
+            logger.debug("coerced value_type %r → %r", v, mapped)
+            return mapped
+        logger.warning("unknown value_type %r, falling back to 'text'", v)
+        return "text"
+
 
 class Event(BaseModel):
     """A dated event extracted from a document. Drives the timeline view."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     id: str
     description: str
@@ -118,7 +200,7 @@ class Event(BaseModel):
 class ExtractionResult(BaseModel):
     """Top-level schema the LLM is asked to produce per chunk."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     entities: list[Entity] = Field(default_factory=list)
     relations: list[Relation] = Field(default_factory=list)

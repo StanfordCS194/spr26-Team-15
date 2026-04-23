@@ -2,7 +2,7 @@
 # Bring up local dev infra (Neo4j + Postgres) and wait for both to be healthy.
 set -euo pipefail
 
-REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || cd "$(dirname "$0")/.." && pwd)
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "$0")/.." && pwd))
 cd "$REPO_ROOT"
 
 if ! command -v docker >/dev/null 2>&1; then
