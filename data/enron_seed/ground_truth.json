@@ -1,0 +1,35 @@
+{
+  "notes": "Hand-labeled ground truth for the seed corpus. Used by backend/tests/eval/. Every entity carries a canonical name so the eval harness can compare against resolver output regardless of which surface form the model extracted.",
+  "entities": [
+    {"canonical_name": "Robert K. Smith", "type": "Person", "surface_forms": ["Robert K. Smith", "Bob Smith", "R.K. Smith", "Mr. Smith"]},
+    {"canonical_name": "Jeffrey K. Skilling", "type": "Person", "surface_forms": ["Jeffrey K. Skilling", "Jeffrey Skilling", "Jeff Skilling", "Mr. Skilling", "Jeff"]},
+    {"canonical_name": "Andrew S. Fastow", "type": "Person", "surface_forms": ["Andrew S. Fastow", "Andrew Fastow", "Mr. Fastow"]},
+    {"canonical_name": "Raptor II", "type": "Organization", "surface_forms": ["Raptor II", "Raptor II Holdings"]},
+    {"canonical_name": "Enron Finance Committee", "type": "Organization", "surface_forms": ["Enron Finance Committee", "finance committee"]},
+    {"canonical_name": "2001-03-09", "type": "Date", "surface_forms": ["March 9, 2001", "Fri, 9 Mar 2001", "the 9th"]},
+    {"canonical_name": "2001-03-12", "type": "Date", "surface_forms": ["March 12, 2001", "Mon, 12 Mar 2001"]},
+    {"canonical_name": "2001-03-15", "type": "Date", "surface_forms": ["March 15, 2001"]},
+    {"canonical_name": "2500000", "type": "Money", "surface_forms": ["$2.5M", "$2.5 million", "2.5 million"]},
+    {"canonical_name": "5000000", "type": "Money", "surface_forms": ["$5 million", "approximately $5 million"]}
+  ],
+  "relations": [
+    {"subject": "Jeffrey K. Skilling", "type": "communicated_with", "object": "Robert K. Smith"},
+    {"subject": "Robert K. Smith", "type": "communicated_with", "object": "Jeffrey K. Skilling"},
+    {"subject": "Raptor II", "type": "party_to", "object": "Enron Finance Committee"},
+    {"subject": "Robert K. Smith", "type": "signed", "object": "Raptor II"}
+  ],
+  "contradictions": [
+    {
+      "subject_canonical": "Robert K. Smith",
+      "predicate": "attended_meeting_on",
+      "conflicting_values": ["2001-03-12", "2001-03-15", "absent"],
+      "min_sources": 2
+    },
+    {
+      "subject_canonical": "Raptor II wire transfer",
+      "predicate": "received_payment_of",
+      "conflicting_values": ["2500000", "5000000"],
+      "min_sources": 2
+    }
+  ]
+}
