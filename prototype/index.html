@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LexGraph Prototype</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div>
+        <p class="eyebrow">AI-Powered Legal Discovery Prototype</p>
+        <h1>Upload case materials, surface contradictions, and inspect the case graph.</h1>
+        <p class="lede">
+          This MVP demonstrates the PRD core: document ingestion, entity extraction,
+          relationship mapping, timeline reconstruction, contradiction detection, and
+          lightweight user-testing instrumentation.
+        </p>
+      </div>
+      <div class="hero-actions">
+        <button id="loadSampleBtn" class="primary">Load Sample Case</button>
+        <label class="upload-button" for="fileInput">Upload Text Files</label>
+        <input id="fileInput" type="file" accept=".txt,.md,.eml,.json" multiple />
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Case Dashboard</h2>
+          <span id="statusBadge" class="badge muted">No case loaded</span>
+        </div>
+        <div id="dashboardStats" class="stats empty-state">
+          Load the sample case or upload documents to build the graph.
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Documents</h2>
+          <button id="reprocessBtn" class="secondary" disabled>Reprocess</button>
+        </div>
+        <div id="documentsList" class="documents empty-state">
+          No documents loaded yet.
+        </div>
+      </section>
+
+      <section class="panel wide">
+        <div class="panel-header">
+          <h2>Knowledge Graph</h2>
+          <input id="entitySearch" type="search" placeholder="Filter entities" />
+        </div>
+        <svg id="graphCanvas" viewBox="0 0 920 420" aria-label="Knowledge graph"></svg>
+        <div class="legend">
+          <span><i class="legend-dot person"></i>Person</span>
+          <span><i class="legend-dot organization"></i>Organization</span>
+          <span><i class="legend-dot date"></i>Date</span>
+          <span><i class="legend-dot money"></i>Money</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Timeline</h2>
+          <select id="timelineFilter">
+            <option value="all">All events</option>
+            <option value="document">Document references</option>
+            <option value="claim">Claim statements</option>
+          </select>
+        </div>
+        <div id="timelineList" class="timeline empty-state">
+          Timeline will appear after processing.
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Contradictions</h2>
+          <span id="contradictionCount" class="badge muted">0 flags</span>
+        </div>
+        <div id="contradictionsList" class="contradictions empty-state">
+          Contradictions will appear after processing.
+        </div>
+      </section>
+
+      <section class="panel wide">
+        <div class="panel-header">
+          <h2>Evidence Detail</h2>
+          <span id="detailHint" class="badge">Click a node, event, or contradiction</span>
+        </div>
+        <div id="detailPane" class="detail empty-state">
+          The supporting excerpts behind the graph, timeline, and contradiction engine
+          appear here.
+        </div>
+      </section>
+
+      <section class="panel wide">
+        <div class="panel-header">
+          <h2>Customer Testing Instrumentation</h2>
+          <button id="exportMetricsBtn" class="secondary">Export Session Data</button>
+        </div>
+        <div class="instrumentation-grid">
+          <div>
+            <h3>Usage Metrics</h3>
+            <div id="metricsSummary" class="metrics-summary empty-state">
+              No interaction data yet.
+            </div>
+          </div>
+          <form id="feedbackForm" class="feedback-form">
+            <h3>Live Feedback Capture</h3>
+            <label>
+              Participant role
+              <input name="role" type="text" placeholder="Attorney, paralegal, founder, etc." required />
+            </label>
+            <label>
+              Usefulness score (1-5)
+              <input name="score" type="number" min="1" max="5" required />
+            </label>
+            <label>
+              Time-to-value observation
+              <input name="timeToValue" type="text" placeholder="e.g. Found contradiction in 45 seconds" required />
+            </label>
+            <label>
+              Notes
+              <textarea
+                name="notes"
+                rows="4"
+                placeholder="Record direct observations from the live session."
+                required
+              ></textarea>
+            </label>
+            <button type="submit" class="primary">Save Feedback</button>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
