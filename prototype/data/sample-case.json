@@ -1,0 +1,40 @@
+{
+  "caseTitle": "Acme Robotics v. Northstar Logistics",
+  "documents": [
+    {
+      "id": "doc-1",
+      "title": "Vendor Contract Excerpt",
+      "type": "contract",
+      "source": "uploaded sample",
+      "content": "On January 15, 2025, Ava Chen, CFO of Acme Robotics, signed a logistics services agreement with Robert Smith of Northstar Logistics. The contract value was $125,000 for delivery support related to the Raven warehouse launch. The agreement states that Northstar Logistics would complete the primary shipment to San Jose on January 18, 2025."
+    },
+    {
+      "id": "doc-2",
+      "title": "Internal Approval Email",
+      "type": "email",
+      "source": "uploaded sample",
+      "content": "From: Ava Chen\nTo: Marcus Hill\nDate: January 16, 2025\nSubject: Approve Northstar invoice\nMarcus, I approved the first Northstar Logistics invoice this morning. Please release the $50,000 advance tied to the January 18 delivery milestone. - Ava"
+    },
+    {
+      "id": "doc-3",
+      "title": "Deposition of Dana Lopez",
+      "type": "deposition",
+      "source": "uploaded sample",
+      "content": "Deposition taken February 3, 2025.\nQ: When did the shipment arrive?\nA: The Northstar truck arrived on January 18, 2025.\nQ: Who approved the first invoice?\nA: Bob Smith told me he approved it after the warehouse team confirmed delivery."
+    },
+    {
+      "id": "doc-4",
+      "title": "Deposition of Marcus Hill",
+      "type": "deposition",
+      "source": "uploaded sample",
+      "content": "Deposition taken February 10, 2025.\nQ: When was the first shipment actually delivered?\nA: It did not reach San Jose until January 25, 2025 because the truck was delayed.\nQ: Who approved the first Northstar invoice?\nA: Ava Chen approved the advance payment before delivery. I released it that same day."
+    },
+    {
+      "id": "doc-5",
+      "title": "Customer Complaint Email",
+      "type": "email",
+      "source": "uploaded sample",
+      "content": "From: Priya Patel\nTo: Ava Chen\nDate: January 26, 2025\nSubject: Damage report\nThe delayed Northstar Logistics shipment finally arrived in San Jose on January 25, 2025. Several pallets were damaged during unloading at the Raven site."
+    }
+  ]
+}
