@@ -1,6 +1,6 @@
 # spr26-Team-15 — AI-Powered Legal Discovery Prototype
 
-Team: Josh Joseph, Alyssa Ong, Arjun Inamdar, Ganesh Venu
+Team: Josh Joseph, Alyssa Ong, Arjun Inamdar, Ganesh Venu, Nathan Elias
 
 - Wiki: https://github.com/StanfordCS194/spr26-Team-15/wiki
 - PRD: https://docs.google.com/document/d/1qcUGxG8V0NCjoZfFDlBGLKftN6Q7ye5ZOV37q1EMHa4/edit
