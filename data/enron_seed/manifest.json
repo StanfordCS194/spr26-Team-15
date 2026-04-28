@@ -1,0 +1,59 @@
+{
+  "case_id": "demo",
+  "case_name": "Enron / Raptor II demo",
+  "documents": [
+    {
+      "path": "depositions/smith_deposition_excerpt.txt",
+      "type": "deposition",
+      "speaker": "Robert K. Smith",
+      "date": "2002-03-14"
+    },
+    {
+      "path": "depositions/fastow_deposition_excerpt.txt",
+      "type": "deposition",
+      "speaker": "Andrew S. Fastow",
+      "date": "2002-04-02"
+    },
+    {
+      "path": "depositions/skilling_deposition_excerpt.txt",
+      "type": "deposition",
+      "speaker": "Jeffrey K. Skilling",
+      "date": "2002-04-09"
+    },
+    {
+      "path": "emails/email_001.txt",
+      "type": "email",
+      "from": "robert.smith@enron.com",
+      "date": "2001-03-12"
+    },
+    {
+      "path": "emails/email_002.txt",
+      "type": "email",
+      "from": "jeffrey.skilling@enron.com",
+      "date": "2001-03-09"
+    },
+    {
+      "path": "memos/internal_memo_raptor2.txt",
+      "type": "memo",
+      "date": "2001-03-12"
+    }
+  ],
+  "expected_entity_minimum": 8,
+  "expected_contradictions": [
+    {
+      "description": "Raptor II meeting date — Smith + Skilling say Mar 12; Fastow says Mar 15.",
+      "subject_canonical_name": "Raptor II finance committee meeting",
+      "predicate": "attended_meeting_on"
+    },
+    {
+      "description": "Wire transfer amount — most docs say $2.5M; Fastow says ~$5M.",
+      "subject_canonical_name": "Raptor II wire transfer",
+      "predicate": "received_payment_of"
+    },
+    {
+      "description": "Smith's attendance — three docs confirm he attended; Fastow says he was absent.",
+      "subject_canonical_name": "Robert K. Smith",
+      "predicate": "attended_meeting_on"
+    }
+  ]
+}
