@@ -23,7 +23,15 @@ from app.graph.writer import (
     upsert_relation,
     wipe_case,
 )
-from app.models.extraction import Claim, Entity, EntityType, Event, Provenance, Relation, RelationType
+from app.models.extraction import (
+    Claim,
+    Entity,
+    EntityType,
+    Event,
+    Provenance,
+    Relation,
+    RelationType,
+)
 
 
 @dataclass(frozen=True)
@@ -255,7 +263,7 @@ def populate_demo_case(case_id: str) -> DemoPipelineStats | None:
             confidence=1.0,
         )
         event_canonical_id = "evt_" + hashlib.sha1(
-            f"{spec.description}|{spec.occurred_at}".encode("utf-8")
+            f"{spec.description}|{spec.occurred_at}".encode()
         ).hexdigest()[:16]
         upsert_event(
             driver,
