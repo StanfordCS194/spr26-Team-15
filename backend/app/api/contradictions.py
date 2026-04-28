@@ -22,6 +22,7 @@ class ClaimExcerpt(BaseModel):
 class ContradictionDetail(BaseModel):
     id: str
     subject_entity_id: str
+    subject_entity_name: str | None
     predicate: str
     explanation: str
     rank_score: float
@@ -31,6 +32,7 @@ class ContradictionDetail(BaseModel):
 @router.get("/{case_id}/contradictions", response_model=list[ContradictionDetail])
 def list_contradictions(case_id: str) -> list[ContradictionDetail]:
     with get_conn() as conn, conn.cursor() as cur:
+        subject_names = _load_subject_names(case_id)
         cur.execute(
             "SELECT id, subject_entity_id, predicate, conflicting_claim_ids, explanation, rank_score "
             "FROM contradictions WHERE case_id = %s ORDER BY rank_score DESC",
@@ -68,6 +70,7 @@ def list_contradictions(case_id: str) -> list[ContradictionDetail]:
                 ContradictionDetail(
                     id=c["id"],
                     subject_entity_id=c["subject_entity_id"],
+                    subject_entity_name=subject_names.get(c["subject_entity_id"]),
                     predicate=c["predicate"],
                     explanation=c["explanation"],
                     rank_score=float(c["rank_score"]),
@@ -75,3 +78,22 @@ def list_contradictions(case_id: str) -> list[ContradictionDetail]:
                 )
             )
     return out
+
+
+def _load_subject_names(case_id: str) -> dict[str, str]:
+    try:
+        from app.graph.client import get_driver
+
+        with get_driver().session() as session:
+            result = session.run(
+                "MATCH (e:Entity {case_id: $cid}) "
+                "RETURN e.canonical_id AS id, e.canonical_name AS name",
+                cid=case_id,
+            )
+            return {
+                row["id"]: row["name"]
+                for row in result
+                if row["id"] and row["name"]
+            }
+    except Exception:
+        return {}
