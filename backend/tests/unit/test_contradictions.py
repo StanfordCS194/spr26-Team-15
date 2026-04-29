@@ -146,3 +146,45 @@ def test_mixed_value_types_do_not_conflict() -> None:
            value_type="text"),
     ]
     assert detect_contradictions(claims) == []
+
+
+def test_predicate_alias_groups_meeting_date_synonyms() -> None:
+    # Two claims about the same meeting using different predicate phrasings should still
+    # be compared and flagged when their dates differ.
+    claims = [
+        _c("cl1", "ent_meeting", "attended_meeting_on", "2001-03-12", chunk_id="doc1:0",
+           value_type="date", speaker="ent_smith"),
+        _c("cl2", "ent_meeting", "meeting_date", "2001-03-15", chunk_id="doc2:0",
+           value_type="date", speaker="ent_fastow"),
+    ]
+    found = detect_contradictions(claims)
+    assert len(found) == 1
+    assert found[0].subject_entity_id == "ent_meeting"
+    # The canonical predicate is what's stored on the record.
+    assert found[0].predicate == "attended_meeting_on"
+    assert set(found[0].conflicting_claim_ids) == {"cl1", "cl2"}
+
+
+def test_predicate_alias_groups_payment_amount_synonyms() -> None:
+    # "wire_amount" and "transferred_amount" should both normalize to "received_payment_of"
+    # so a $2.5M vs $5M conflict is caught.
+    claims = [
+        _c("cl1", "ent_wire", "wire_amount", "2500000", chunk_id="doc1:0",
+           value_type="money"),
+        _c("cl2", "ent_wire", "transferred_amount", "5000000", chunk_id="doc2:0",
+           value_type="money"),
+    ]
+    found = detect_contradictions(claims)
+    assert len(found) == 1
+    assert found[0].predicate == "received_payment_of"
+
+
+def test_unrelated_predicates_still_do_not_group() -> None:
+    # The alias map must not over-merge: predicates outside the map keep their literal form.
+    claims = [
+        _c("cl1", "ent_A", "employed_by", "Acme", chunk_id="doc1:0",
+           value_type="text"),
+        _c("cl2", "ent_A", "lived_at", "Houston", chunk_id="doc2:0",
+           value_type="text"),
+    ]
+    assert detect_contradictions(claims) == []
