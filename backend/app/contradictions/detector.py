@@ -28,41 +28,6 @@ from app.models.extraction import Claim
 _PUNCT = re.compile(r"[^\w\s]")
 
 
-# Predicate variants that mean the same fact, mapped to a canonical form. Llama (and to a
-# lesser extent Claude) tends to drift across chunks — emitting "meeting_date" in one chunk
-# and "attended_meeting_on" in another for the same underlying claim. Without normalization,
-# these land in different (subject, predicate) buckets and never get compared, so real
-# contradictions stay hidden.
-#
-# Keep this conservative: only true synonyms. `value_type` already guards against cross-shape
-# comparisons (e.g. a date claim won't conflict with a text claim even if predicates match),
-# so we don't have to be paranoid about merging semantically-similar predicates.
-_PREDICATE_ALIASES: dict[str, str] = {
-    # Meeting / event date — subject is a person or event, value is a date.
-    "meeting_date": "attended_meeting_on",
-    "date_of_meeting": "attended_meeting_on",
-    "meeting_attended_on": "attended_meeting_on",
-    "was_at_meeting_on": "attended_meeting_on",
-    "present_at_meeting_on": "attended_meeting_on",
-    # Payment / wire transfer amount — value is a money amount.
-    "wire_amount": "received_payment_of",
-    "wire_transfer_amount": "received_payment_of",
-    "transfer_amount": "received_payment_of",
-    "transferred_amount": "received_payment_of",
-    "received_amount": "received_payment_of",
-    "amount_received": "received_payment_of",
-    "amount_paid": "received_payment_of",
-    "paid_amount": "received_payment_of",
-    "payment_amount": "received_payment_of",
-}
-
-
-def _normalize_predicate(predicate: str) -> str:
-    """Lowercase, strip, then apply the alias map so synonymous predicates group together."""
-    key = predicate.strip().lower()
-    return _PREDICATE_ALIASES.get(key, key)
-
-
 @dataclass(frozen=True)
 class ContradictionRecord:
     id: str
@@ -146,11 +111,12 @@ def detect_contradictions(
     mapping = local_to_canonical or {}
 
     # Group by (canonical_subject, normalized_predicate).
+    # Predicate normalization (alias map + lowercasing) happens at extraction time via
+    # Claim._normalize_predicate, so c.predicate is already canonical here.
     groups: dict[tuple[str, str], list[Claim]] = {}
     for c in claims:
         subject = mapping.get(c.subject_entity_id, c.subject_entity_id)
-        pred = _normalize_predicate(c.predicate)
-        groups.setdefault((subject, pred), []).append(c)
+        groups.setdefault((subject, c.predicate), []).append(c)
 
     out: list[ContradictionRecord] = []
     for (subject, pred), group in groups.items():

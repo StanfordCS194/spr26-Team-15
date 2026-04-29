@@ -42,6 +42,30 @@ _RELATION_TYPE_ALIASES: dict[str, str] = {
     "based_in": "located_at",
 }
 
+# Predicate variants the LLM tends to drift between across chunks (e.g. "meeting_date" in one
+# chunk, "attended_meeting_on" in another for the same underlying fact). Normalized at
+# extraction time so the canonical form is what gets persisted to Postgres and what the
+# contradiction detector buckets on. Conservative — only true synonyms — because value_type
+# already prevents cross-shape comparisons (a date claim never conflicts with a text claim).
+_PREDICATE_ALIASES: dict[str, str] = {
+    # Meeting / event date — subject is a person or event, value is a date.
+    "meeting_date": "attended_meeting_on",
+    "date_of_meeting": "attended_meeting_on",
+    "meeting_attended_on": "attended_meeting_on",
+    "was_at_meeting_on": "attended_meeting_on",
+    "present_at_meeting_on": "attended_meeting_on",
+    # Payment / wire transfer amount — value is a money amount.
+    "wire_amount": "received_payment_of",
+    "wire_transfer_amount": "received_payment_of",
+    "transfer_amount": "received_payment_of",
+    "transferred_amount": "received_payment_of",
+    "received_amount": "received_payment_of",
+    "amount_received": "received_payment_of",
+    "amount_paid": "received_payment_of",
+    "paid_amount": "received_payment_of",
+    "payment_amount": "received_payment_of",
+}
+
 _VALUE_TYPE_ALIASES: dict[str, str] = {
     "string": "text",
     "str": "text",
@@ -165,6 +189,18 @@ class Claim(BaseModel):
     speaker_entity_id: str | None = None  # who made the claim (deposition witness, email author)
     provenance: Provenance
     confidence: float = Field(ge=0.0, le=1.0, default=0.8)
+
+    @field_validator("predicate", mode="before")
+    @classmethod
+    def _normalize_predicate(cls, v: object) -> object:
+        if not isinstance(v, str):
+            return v
+        key = v.strip().lower()
+        if key in _PREDICATE_ALIASES:
+            mapped = _PREDICATE_ALIASES[key]
+            logger.debug("coerced predicate %r → %r", v, mapped)
+            return mapped
+        return key
 
     @field_validator("value_type", mode="before")
     @classmethod
