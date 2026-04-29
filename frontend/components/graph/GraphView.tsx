@@ -140,6 +140,22 @@ export function GraphView({ caseId, selectedId, refreshToken = 0, onSelect }: Pr
           role="group"
           aria-label="Filter by entity type"
         >
+          <button
+            type="button"
+            onClick={() => setTypeFilter("all")}
+            aria-pressed={typeFilter === "all"}
+            className={
+              "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors " +
+              (typeFilter === "all"
+                ? "border-[color:var(--text)] bg-[color:var(--text)] text-white"
+                : "border-[color:var(--line)] bg-white text-[color:var(--muted)] hover:bg-white/80")
+            }
+          >
+            <span className="font-medium">All</span>
+            <span className={typeFilter === "all" ? "text-white/65" : "text-[color:var(--muted)]"}>
+              {entities.length}
+            </span>
+          </button>
           {Object.entries(TYPE_COLORS)
             .filter(([type]) => (typeCounts[type] ?? 0) > 0)
             .map(([type, color]) => {

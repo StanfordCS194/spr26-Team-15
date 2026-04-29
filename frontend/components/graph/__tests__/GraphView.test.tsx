@@ -88,4 +88,29 @@ describe("GraphView type-legend chips", () => {
     expect(personChip.getAttribute("aria-pressed")).toBe("false");
     expect(orgChip.getAttribute("aria-pressed")).toBe("true");
   });
+
+  it("'All' chip is active by default and shows total entity count", async () => {
+    render(<GraphView caseId="demo" selectedId={null} onSelect={() => {}} />);
+
+    const chipGroup = await getChipGroup();
+    const allChip = within(chipGroup).getByRole("button", { name: /^All/ });
+    expect(allChip.getAttribute("aria-pressed")).toBe("true");
+    expect(allChip.textContent).toContain("5"); // 3 Persons + 2 Organizations
+  });
+
+  it("clicking 'All' clears the active type filter", async () => {
+    render(<GraphView caseId="demo" selectedId={null} onSelect={() => {}} />);
+
+    const chipGroup = await getChipGroup();
+    const personChip = within(chipGroup).getByRole("button", { name: /Person/ });
+    const allChip = within(chipGroup).getByRole("button", { name: /^All/ });
+
+    fireEvent.click(personChip);
+    expect(personChip.getAttribute("aria-pressed")).toBe("true");
+    expect(allChip.getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(allChip);
+    expect(personChip.getAttribute("aria-pressed")).toBe("false");
+    expect(allChip.getAttribute("aria-pressed")).toBe("true");
+  });
 });
