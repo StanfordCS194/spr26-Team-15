@@ -79,7 +79,7 @@ export default function CaseWorkspacePage() {
       {error && <div className="bg-red-50 px-4 py-2 text-sm text-red-600">Error: {error}</div>}
 
       {tab === "workspace" ? (
-        <div className="grid flex-1 grid-cols-[1fr_minmax(320px,420px)] grid-rows-[1fr_220px] overflow-hidden">
+        <div className="grid flex-1 grid-cols-[1fr_minmax(320px,420px)] grid-rows-[1fr_320px] overflow-hidden">
           <div className="row-span-1 border-r border-neutral-200">
             <GraphView
               caseId={caseId}

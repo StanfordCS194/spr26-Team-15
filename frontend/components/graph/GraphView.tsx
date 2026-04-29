@@ -78,6 +78,14 @@ export function GraphView({ caseId, selectedId, onSelect }: Props) {
     };
   }, [caseId]);
 
+  const typeCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const e of entities) {
+      counts[e.type] = (counts[e.type] ?? 0) + 1;
+    }
+    return counts;
+  }, [entities]);
+
   const { nodes, edges } = useMemo(() => {
     const filtered = entities.filter((e) => {
       if (typeFilter !== "all" && e.type !== typeFilter) return false;
@@ -127,29 +135,57 @@ export function GraphView({ caseId, selectedId, onSelect }: Props) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex gap-2 border-b border-neutral-200 bg-white p-2 text-xs">
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="rounded border px-2 py-1"
+      <div className="flex flex-col gap-2 border-b border-neutral-200 bg-white p-2 text-xs">
+        <div
+          className="flex flex-wrap gap-1.5"
+          role="group"
+          aria-label="Filter by entity type"
         >
-          <option value="all">All types</option>
-          {Object.keys(TYPE_COLORS).map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-        <input
-          type="search"
-          placeholder="Search by name"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 rounded border px-2 py-1"
-        />
-        <span className="self-center text-neutral-500">
-          {nodes.length} nodes · {edges.length} edges
-        </span>
+          {Object.entries(TYPE_COLORS)
+            .filter(([type]) => (typeCounts[type] ?? 0) > 0)
+            .map(([type, color]) => {
+              const active = typeFilter === type;
+              const count = typeCounts[type] ?? 0;
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() =>
+                    setTypeFilter((prev) => (prev === type ? "all" : type))
+                  }
+                  aria-pressed={active}
+                  className={
+                    "flex items-center gap-1.5 rounded-full border px-2.5 py-1 transition-colors " +
+                    (active
+                      ? "border-neutral-900 bg-neutral-900 text-white"
+                      : "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50")
+                  }
+                >
+                  <span
+                    aria-hidden="true"
+                    className="inline-block h-2.5 w-2.5 rounded-full"
+                    style={{ background: color }}
+                  />
+                  <span className="font-medium">{type}</span>
+                  <span className={active ? "text-neutral-300" : "text-neutral-500"}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="search"
+            placeholder="Search by name"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 rounded border px-2 py-1"
+          />
+          <span className="self-center whitespace-nowrap text-neutral-500">
+            {nodes.length} nodes · {edges.length} edges
+          </span>
+        </div>
       </div>
       <div className="flex-1 bg-white">
         <ReactFlow
