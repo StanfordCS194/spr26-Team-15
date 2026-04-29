@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 
 vi.mock("@/lib/api", () => ({
   getGraph: vi.fn(),
@@ -29,6 +29,9 @@ const mockGraph = {
   events: [],
 };
 
+const getChipGroup = () =>
+  screen.findByRole("group", { name: "Filter by entity type" });
+
 describe("GraphView type-legend chips", () => {
   beforeEach(() => {
     vi.mocked(getGraph).mockResolvedValue(mockGraph as never);
@@ -37,11 +40,12 @@ describe("GraphView type-legend chips", () => {
   it("renders one chip per type that has entities, with counts", async () => {
     render(<GraphView caseId="demo" selectedId={null} onSelect={() => {}} />);
 
-    const personChip = await screen.findByRole("button", { name: /Person/ });
+    const chipGroup = await getChipGroup();
+    const personChip = within(chipGroup).getByRole("button", { name: /Person/ });
     expect(personChip.textContent).toContain("Person");
     expect(personChip.textContent).toContain("3");
 
-    const orgChip = screen.getByRole("button", { name: /Organization/ });
+    const orgChip = within(chipGroup).getByRole("button", { name: /Organization/ });
     expect(orgChip.textContent).toContain("Organization");
     expect(orgChip.textContent).toContain("2");
   });
@@ -49,16 +53,17 @@ describe("GraphView type-legend chips", () => {
   it("does not render chips for types that have zero entities", async () => {
     render(<GraphView caseId="demo" selectedId={null} onSelect={() => {}} />);
 
-    await screen.findByRole("button", { name: /Person/ });
-    expect(screen.queryByRole("button", { name: /Date/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Money/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Document/ })).toBeNull();
+    const chipGroup = await getChipGroup();
+    expect(within(chipGroup).queryByRole("button", { name: /Date/ })).toBeNull();
+    expect(within(chipGroup).queryByRole("button", { name: /Money/ })).toBeNull();
+    expect(within(chipGroup).queryByRole("button", { name: /Document/ })).toBeNull();
   });
 
   it("toggles aria-pressed when a chip is clicked twice", async () => {
     render(<GraphView caseId="demo" selectedId={null} onSelect={() => {}} />);
 
-    const personChip = await screen.findByRole("button", { name: /Person/ });
+    const chipGroup = await getChipGroup();
+    const personChip = within(chipGroup).getByRole("button", { name: /Person/ });
     expect(personChip.getAttribute("aria-pressed")).toBe("false");
 
     fireEvent.click(personChip);
@@ -71,8 +76,9 @@ describe("GraphView type-legend chips", () => {
   it("only one chip can be active at a time", async () => {
     render(<GraphView caseId="demo" selectedId={null} onSelect={() => {}} />);
 
-    const personChip = await screen.findByRole("button", { name: /Person/ });
-    const orgChip = screen.getByRole("button", { name: /Organization/ });
+    const chipGroup = await getChipGroup();
+    const personChip = within(chipGroup).getByRole("button", { name: /Person/ });
+    const orgChip = within(chipGroup).getByRole("button", { name: /Organization/ });
 
     fireEvent.click(personChip);
     expect(personChip.getAttribute("aria-pressed")).toBe("true");

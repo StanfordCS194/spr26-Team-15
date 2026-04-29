@@ -16,6 +16,17 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export async function createCase(
+  caseId: string,
+  name = `Case ${caseId}`,
+): Promise<CaseSummary> {
+  return fetchJson<CaseSummary>("/cases", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: caseId, name }),
+  });
+}
+
 export async function getCase(caseId: string): Promise<CaseSummary> {
   return fetchJson<CaseSummary>(`/cases/${encodeURIComponent(caseId)}`);
 }
@@ -30,6 +41,7 @@ export async function getEvents(caseId: string) {
     description: string;
     occurred_at: string;
     participant_ids: string[];
+    participants: Array<{ id: string; name: string }>;
     provenance: string[];
   }>>(`/cases/${encodeURIComponent(caseId)}/events`);
 }
@@ -47,6 +59,7 @@ export async function getDocument(caseId: string, docId: string): Promise<Docume
 export interface ContradictionDetail {
   id: string;
   subject_entity_id: string;
+  subject_entity_name: string | null;
   predicate: string;
   explanation: string;
   rank_score: number;
@@ -71,7 +84,21 @@ export async function listContradictions(caseId: string): Promise<ContradictionD
 export async function uploadDocument(
   caseId: string,
   file: File,
-): Promise<DocumentSummary> {
+): Promise<{
+  document: DocumentSummary;
+  pipeline: {
+    documents_processed: number;
+    chunks_processed: number;
+    chunks_failed: number;
+    entities_extracted: number;
+    relations_extracted: number;
+    claims_extracted: number;
+    events_extracted: number;
+    entity_clusters: number;
+    contradictions_found: number;
+  };
+  message: string;
+}> {
   const form = new FormData();
   form.append("file", file);
   const res = await fetch(

@@ -10,7 +10,7 @@ import ReactFlow, {
 import { useEffect, useMemo, useState } from "react";
 
 import { getGraph } from "@/lib/api";
-import type { Entity, Relation } from "@/lib/types";
+import type { GraphEntity, GraphRelation } from "@/lib/types";
 
 const TYPE_COLORS: Record<string, string> = {
   Person: "#c65d3a",
@@ -25,12 +25,13 @@ const TYPE_COLORS: Record<string, string> = {
 interface Props {
   caseId: string;
   selectedId: string | null;
-  onSelect: (id: string, entity: Entity | null) => void;
+  refreshToken?: number;
+  onSelect: (id: string, entity: GraphEntity | null) => void;
 }
 
-export function GraphView({ caseId, selectedId, onSelect }: Props) {
-  const [entities, setEntities] = useState<Entity[]>([]);
-  const [relations, setRelations] = useState<Relation[]>([]);
+export function GraphView({ caseId, selectedId, refreshToken = 0, onSelect }: Props) {
+  const [entities, setEntities] = useState<GraphEntity[]>([]);
+  const [relations, setRelations] = useState<GraphRelation[]>([]);
   const [typeFilter, setTypeFilter] = useState<string | "all">("all");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -43,40 +44,15 @@ export function GraphView({ caseId, selectedId, onSelect }: Props) {
     getGraph(caseId)
       .then((g) => {
         if (cancelled) return;
-        // Backend returns {id, type, name, ...} — mirror onto our Entity shape for local use.
-        setEntities(
-          g.entities.map((e: unknown) => {
-            const raw = e as Record<string, unknown>;
-            return {
-              id: String(raw.id),
-              type: raw.type as Entity["type"],
-              mention_text: String(raw.name ?? ""),
-              canonical_name: String(raw.name ?? ""),
-              provenance: { source_doc_id: "", chunk_id: "", char_start: 0, char_end: 0 },
-              confidence: 1,
-            };
-          }),
-        );
-        setRelations(
-          g.relations.map((r: unknown) => {
-            const raw = r as Record<string, unknown>;
-            return {
-              id: `${raw.subject_id}-${raw.type}-${raw.object_id}`,
-              type: raw.type as Relation["type"],
-              subject_id: String(raw.subject_id),
-              object_id: String(raw.object_id),
-              provenance: { source_doc_id: "", chunk_id: "", char_start: 0, char_end: 0 },
-              confidence: 1,
-            };
-          }),
-        );
+        setEntities(g.entities);
+        setRelations(g.relations);
       })
       .catch((e) => !cancelled && setError(String(e)))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [caseId]);
+  }, [caseId, refreshToken]);
 
   const typeCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -89,8 +65,7 @@ export function GraphView({ caseId, selectedId, onSelect }: Props) {
   const { nodes, edges } = useMemo(() => {
     const filtered = entities.filter((e) => {
       if (typeFilter !== "all" && e.type !== typeFilter) return false;
-      if (search && !(e.canonical_name ?? e.mention_text).toLowerCase().includes(search.toLowerCase()))
-        return false;
+      if (search && !e.name.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });
 
@@ -103,7 +78,7 @@ export function GraphView({ caseId, selectedId, onSelect }: Props) {
       const selected = e.id === selectedId;
       return {
         id: e.id,
-        data: { label: e.canonical_name ?? e.mention_text },
+        data: { label: e.name },
         position: { x, y },
         style: {
           background: TYPE_COLORS[e.type] ?? "#333",
@@ -120,7 +95,7 @@ export function GraphView({ caseId, selectedId, onSelect }: Props) {
     const edges: Edge[] = relations
       .filter((r) => visibleIds.has(r.subject_id) && visibleIds.has(r.object_id))
       .map((r) => ({
-        id: r.id,
+        id: `${r.subject_id}-${r.type}-${r.object_id}`,
         source: r.subject_id,
         target: r.object_id,
         label: r.type,
@@ -130,14 +105,38 @@ export function GraphView({ caseId, selectedId, onSelect }: Props) {
     return { nodes, edges };
   }, [entities, relations, typeFilter, search, selectedId]);
 
-  if (loading) return <div className="p-4 text-sm text-neutral-500">Loading graph…</div>;
-  if (error) return <div className="p-4 text-sm text-red-600">Graph error: {error}</div>;
+  const filteredEntities = useMemo(
+    () =>
+      entities
+        .filter((e) => {
+          if (typeFilter !== "all" && e.type !== typeFilter) return false;
+          if (search && !e.name.toLowerCase().includes(search.toLowerCase())) return false;
+          return true;
+        })
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [entities, typeFilter, search],
+  );
+
+  if (loading) return <div className="p-5 text-sm text-[color:var(--muted)]">Loading graph…</div>;
+  if (error) return <div className="p-5 text-sm text-red-600">Graph error: {error}</div>;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex flex-col gap-2 border-b border-neutral-200 bg-white p-2 text-xs">
+    <div className="flex h-full flex-col bg-[linear-gradient(180deg,rgba(255,253,250,0.95),rgba(248,242,235,0.88))]">
+      <div className="border-b border-[color:var(--line)] px-4 py-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="panel-title">Relationship Graph</div>
+            <h2 className="mt-2 text-xl font-semibold">Entity map</h2>
+            <p className="mt-1 max-w-xl text-sm leading-6 text-[color:var(--muted)]">
+              Use the graph to pivot between people, organizations, and other extracted entities.
+            </p>
+          </div>
+          <span className="rounded-full border border-[color:var(--line)] bg-white px-3 py-1 text-xs text-[color:var(--muted)]">
+            {nodes.length} nodes · {edges.length} edges
+          </span>
+        </div>
         <div
-          className="flex flex-wrap gap-1.5"
+          className="mt-3 flex flex-wrap gap-1.5"
           role="group"
           aria-label="Filter by entity type"
         >
@@ -155,10 +154,10 @@ export function GraphView({ caseId, selectedId, onSelect }: Props) {
                   }
                   aria-pressed={active}
                   className={
-                    "flex items-center gap-1.5 rounded-full border px-2.5 py-1 transition-colors " +
+                    "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors " +
                     (active
-                      ? "border-neutral-900 bg-neutral-900 text-white"
-                      : "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50")
+                      ? "border-[color:var(--text)] bg-[color:var(--text)] text-white"
+                      : "border-[color:var(--line)] bg-white text-[color:var(--muted)] hover:bg-white/80")
                   }
                 >
                   <span
@@ -167,39 +166,86 @@ export function GraphView({ caseId, selectedId, onSelect }: Props) {
                     style={{ background: color }}
                   />
                   <span className="font-medium">{type}</span>
-                  <span className={active ? "text-neutral-300" : "text-neutral-500"}>
+                  <span className={active ? "text-white/65" : "text-[color:var(--muted)]"}>
                     {count}
                   </span>
                 </button>
               );
             })}
         </div>
-        <div className="flex gap-2">
-          <input
-            type="search"
-            placeholder="Search by name"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 rounded border px-2 py-1"
-          />
-          <span className="self-center whitespace-nowrap text-neutral-500">
-            {nodes.length} nodes · {edges.length} edges
-          </span>
-        </div>
+        <input
+          type="search"
+          placeholder="Search by entity name"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="mt-3 w-full rounded-xl border border-[color:var(--line)] bg-white px-3 py-2 text-sm"
+        />
       </div>
-      <div className="flex-1 bg-white">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[270px_1fr]">
+        <aside className="border-b border-[color:var(--line)] bg-[#f7efe4] lg:border-b-0 lg:border-r">
+          <div className="border-b border-[color:var(--line)] px-4 py-3">
+            <div className="panel-title">Entity Navigator</div>
+            <div className="mt-2 text-sm text-[color:var(--muted)]">
+              Browse extracted entities directly and use the graph for relationship context.
+            </div>
+          </div>
+          <div className="max-h-[280px] overflow-y-auto lg:max-h-none lg:h-full">
+            {filteredEntities.length === 0 ? (
+              <div className="p-4 text-sm text-[color:var(--muted)]">
+                No entities match the current filter.
+              </div>
+            ) : (
+              <ul className="divide-y divide-[color:var(--line)]">
+                {filteredEntities.map((entity) => {
+                  const isSelected = entity.id === selectedId;
+                  return (
+                    <li key={entity.id}>
+                      <button
+                        type="button"
+                        onClick={() => onSelect(entity.id, entity)}
+                        className={
+                          isSelected
+                            ? "w-full bg-[linear-gradient(135deg,#2d2520,#1f1a16)] px-4 py-3 text-left text-white"
+                            : "w-full px-4 py-3 text-left hover:bg-white/70"
+                        }
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium">{entity.name}</div>
+                            <div className={isSelected ? "mt-1 text-xs text-white/65" : "mt-1 text-xs text-[color:var(--muted)]"}>
+                              {entity.type}
+                            </div>
+                          </div>
+                          <span
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: TYPE_COLORS[entity.type] ?? "#333" }}
+                          />
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </aside>
+        <div className="relative min-h-[340px] bg-white/80">
+        {nodes.length === 0 && (
+          <div className="pointer-events-none absolute left-4 top-4 z-10 max-w-sm rounded-2xl border border-[color:var(--line)] bg-white/92 px-4 py-3 text-sm text-[color:var(--muted)] shadow-sm">
+            No entities are visible yet. Process a case or broaden the filter to populate the graph.
+          </div>
+        )}
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodeClick={(_, node) =>
-            onSelect(node.id, entities.find((e) => e.id === node.id) ?? null)
-          }
+          onNodeClick={(_, node) => onSelect(node.id, entities.find((e) => e.id === node.id) ?? null)}
           fitView
         >
-          <Background gap={16} />
+          <Background gap={20} color="rgba(128, 107, 88, 0.16)" />
           <Controls />
           <MiniMap pannable zoomable />
         </ReactFlow>
+        </div>
       </div>
     </div>
   );

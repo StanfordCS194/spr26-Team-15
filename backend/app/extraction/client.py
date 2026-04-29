@@ -17,11 +17,22 @@ import logging
 from dataclasses import dataclass
 
 from pydantic import ValidationError
-from tenacity import Retrying, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import (
+    Retrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from app.config import get_settings
 from app.extraction.prompts import FEW_SHOT_EXAMPLES, SYSTEM_PROMPT, build_user_message
-from app.llm import LLMParseError, LLMUsage, AnthropicProvider, GroqProvider, make_provider
+from app.llm import (
+    AnthropicProvider,
+    GroqProvider,
+    LLMParseError,
+    LLMUsage,
+    make_provider,
+)
 from app.models.extraction import ExtractionResult
 
 logger = logging.getLogger(__name__)
