@@ -54,6 +54,14 @@ export function GraphView({ caseId, selectedId, refreshToken = 0, onSelect }: Pr
     };
   }, [caseId, refreshToken]);
 
+  const typeCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const e of entities) {
+      counts[e.type] = (counts[e.type] ?? 0) + 1;
+    }
+    return counts;
+  }, [entities]);
+
   const { nodes, edges } = useMemo(() => {
     const filtered = entities.filter((e) => {
       if (typeFilter !== "all" && e.type !== typeFilter) return false;
@@ -127,27 +135,67 @@ export function GraphView({ caseId, selectedId, refreshToken = 0, onSelect }: Pr
             {nodes.length} nodes · {edges.length} edges
           </span>
         </div>
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="rounded-xl border border-[color:var(--line)] bg-white px-3 py-2 text-sm"
+        <div
+          className="mt-3 flex flex-wrap gap-1.5"
+          role="group"
+          aria-label="Filter by entity type"
+        >
+          <button
+            type="button"
+            onClick={() => setTypeFilter("all")}
+            aria-pressed={typeFilter === "all"}
+            className={
+              "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors " +
+              (typeFilter === "all"
+                ? "border-[color:var(--text)] bg-[color:var(--text)] text-white"
+                : "border-[color:var(--line)] bg-white text-[color:var(--muted)] hover:bg-white/80")
+            }
           >
-            <option value="all">All entity types</option>
-            {Object.keys(TYPE_COLORS).map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-          <input
-            type="search"
-            placeholder="Search by entity name"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 rounded-xl border border-[color:var(--line)] bg-white px-3 py-2 text-sm"
-          />
+            <span className="font-medium">All</span>
+            <span className={typeFilter === "all" ? "text-white/65" : "text-[color:var(--muted)]"}>
+              {entities.length}
+            </span>
+          </button>
+          {Object.entries(TYPE_COLORS)
+            .filter(([type]) => (typeCounts[type] ?? 0) > 0)
+            .map(([type, color]) => {
+              const active = typeFilter === type;
+              const count = typeCounts[type] ?? 0;
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() =>
+                    setTypeFilter((prev) => (prev === type ? "all" : type))
+                  }
+                  aria-pressed={active}
+                  className={
+                    "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors " +
+                    (active
+                      ? "border-[color:var(--text)] bg-[color:var(--text)] text-white"
+                      : "border-[color:var(--line)] bg-white text-[color:var(--muted)] hover:bg-white/80")
+                  }
+                >
+                  <span
+                    aria-hidden="true"
+                    className="inline-block h-2.5 w-2.5 rounded-full"
+                    style={{ background: color }}
+                  />
+                  <span className="font-medium">{type}</span>
+                  <span className={active ? "text-white/65" : "text-[color:var(--muted)]"}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
         </div>
+        <input
+          type="search"
+          placeholder="Search by entity name"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="mt-3 w-full rounded-xl border border-[color:var(--line)] bg-white px-3 py-2 text-sm"
+        />
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[270px_1fr]">
         <aside className="border-b border-[color:var(--line)] bg-[#f7efe4] lg:border-b-0 lg:border-r">

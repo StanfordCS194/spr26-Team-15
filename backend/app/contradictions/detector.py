@@ -111,11 +111,12 @@ def detect_contradictions(
     mapping = local_to_canonical or {}
 
     # Group by (canonical_subject, normalized_predicate).
+    # Predicate normalization (alias map + lowercasing) happens at extraction time via
+    # Claim._normalize_predicate, so c.predicate is already canonical here.
     groups: dict[tuple[str, str], list[Claim]] = {}
     for c in claims:
         subject = mapping.get(c.subject_entity_id, c.subject_entity_id)
-        pred = c.predicate.strip().lower()
-        groups.setdefault((subject, pred), []).append(c)
+        groups.setdefault((subject, c.predicate), []).append(c)
 
     out: list[ContradictionRecord] = []
     for (subject, pred), group in groups.items():
