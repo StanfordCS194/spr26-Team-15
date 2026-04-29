@@ -7,6 +7,7 @@ import { createCase, getCase, parseProvenance } from "@/lib/api";
 import type { CaseSummary, GraphEntity } from "@/lib/types";
 import { ContradictionsPanel } from "@/components/contradictions/ContradictionsPanel";
 import { DocPane } from "@/components/document/DocPane";
+import { ExportReportButton } from "@/components/export/ExportReportButton";
 import { GraphView } from "@/components/graph/GraphView";
 import { Timeline } from "@/components/timeline/Timeline";
 import { UploadPanel } from "@/components/upload/UploadPanel";
@@ -110,6 +111,7 @@ export default function CaseWorkspacePage() {
   }, []);
 
   return (
+<<<<<<< Updated upstream
     <main className="workspace-shell">
       <div className="workspace-card flex min-h-[calc(100vh-36px)] flex-col overflow-hidden rounded-[28px]">
         <header className="border-b border-[color:var(--line)] bg-[linear-gradient(135deg,rgba(255,250,244,0.98),rgba(247,238,228,0.94))] px-5 py-4 sm:px-6">
@@ -138,6 +140,31 @@ export default function CaseWorkspacePage() {
               </TabButton>
             </nav>
           </div>
+=======
+    <main className="flex h-screen flex-col">
+      <header className="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-2">
+        <div>
+          <h1 className="text-sm font-semibold">{summary?.name ?? `Case ${caseId}`}</h1>
+          {summary && (
+            <p className="text-xs text-neutral-500">
+              {summary.document_count} documents · {summary.entity_count} entities ·{" "}
+              {summary.contradiction_count} contradictions
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <ExportReportButton caseId={caseId} />
+          <nav className="flex gap-1 text-xs">
+            <TabButton active={tab === "workspace"} onClick={() => setTab("workspace")}>
+              Workspace
+            </TabButton>
+            <TabButton active={tab === "contradictions"} onClick={() => setTab("contradictions")}>
+              Contradictions {summary ? `(${summary.contradiction_count})` : null}
+            </TabButton>
+          </nav>
+        </div>
+      </header>
+>>>>>>> Stashed changes
 
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <MetricCard label="Documents" value={summary?.document_count ?? 0} tone="sand" />
