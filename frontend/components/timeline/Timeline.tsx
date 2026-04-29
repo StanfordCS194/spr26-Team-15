@@ -11,17 +11,28 @@ interface TimelineEvent {
   description: string;
   occurred_at: string;
   participant_ids: string[];
+  participants: Array<{ id: string; name: string }>;
+  provenance: string[];
 }
 
 interface Props {
   caseId: string;
-  onEventSelect: (eventId: string) => void;
+  refreshToken?: number;
+  onEventSelect: (event: TimelineEvent) => void;
+  onParticipantSelect: (entityId: string) => void;
 }
 
-export function Timeline({ caseId, onEventSelect }: Props) {
+export function Timeline({
+  caseId,
+  refreshToken = 0,
+  onEventSelect,
+  onParticipantSelect,
+}: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const timelineRef = useRef<VisTimeline | null>(null);
   const [events, setEvents] = useState<TimelineEvent[]>([]);
+  const [search, setSearch] = useState("");
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,24 +40,28 @@ export function Timeline({ caseId, onEventSelect }: Props) {
     getEvents(caseId)
       .then((es) => {
         if (!cancelled) {
-          setEvents(
-            es.map((e) => ({
-              id: e.id,
-              description: e.description,
-              occurred_at: e.occurred_at,
-              participant_ids: e.participant_ids,
-            })),
-          );
+          setEvents(es);
+          setSelectedEventId((current) => current ?? es[0]?.id ?? null);
         }
       })
       .catch((e) => !cancelled && setError(String(e)));
     return () => {
       cancelled = true;
     };
-  }, [caseId]);
+  }, [caseId, refreshToken]);
+
+  const filteredEvents = events.filter((event) => {
+    if (!search.trim()) return true;
+    const q = search.trim().toLowerCase();
+    return (
+      event.description.toLowerCase().includes(q) ||
+      event.occurred_at.toLowerCase().includes(q) ||
+      event.participants.some((participant) => participant.name.toLowerCase().includes(q))
+    );
+  });
 
   useEffect(() => {
-    if (!containerRef.current || events.length === 0) return;
+    if (!containerRef.current || filteredEvents.length === 0) return;
 
     let cancelled = false;
     (async () => {
@@ -55,7 +70,7 @@ export function Timeline({ caseId, onEventSelect }: Props) {
       if (cancelled || !containerRef.current) return;
 
       const items = new DataSet(
-        events.map((e) => ({
+        filteredEvents.map((e) => ({
           id: e.id,
           content: e.description,
           start: e.occurred_at,
@@ -71,7 +86,11 @@ export function Timeline({ caseId, onEventSelect }: Props) {
         height: "100%",
       });
       timelineRef.current.on("select", (evt: { items: string[] }) => {
-        if (evt.items.length > 0) onEventSelect(evt.items[0]);
+        if (evt.items.length === 0) return;
+        const event = events.find((candidate) => candidate.id === evt.items[0]);
+        if (!event) return;
+        setSelectedEventId(event.id);
+        onEventSelect(event);
       });
     })();
 
@@ -80,11 +99,153 @@ export function Timeline({ caseId, onEventSelect }: Props) {
       timelineRef.current?.destroy();
       timelineRef.current = null;
     };
-  }, [events, onEventSelect]);
+  }, [events, filteredEvents, onEventSelect]);
 
-  if (error) return <div className="p-4 text-sm text-red-600">Timeline error: {error}</div>;
+  if (error) return <div className="p-5 text-sm text-red-600">Timeline error: {error}</div>;
   if (events.length === 0)
-    return <div className="p-4 text-sm text-neutral-500">No events yet.</div>;
+    return (
+      <div className="flex h-full flex-col justify-between p-5">
+        <div>
+          <div className="panel-title">Timeline</div>
+          <h2 className="mt-2 text-lg font-semibold">No extracted events yet</h2>
+          <p className="mt-2 max-w-lg text-sm leading-6 text-[color:var(--muted)]">
+            Once the case pipeline extracts dated events, this timeline becomes the primary entry
+            point for reviewing what happened, when it happened, and which people or organizations
+            were involved.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-dashed border-[color:var(--line-strong)] bg-[color:var(--bg-soft)] p-4 text-sm text-[color:var(--muted)]">
+          Tip: use the seeded Enron corpus or a processed case to showcase timeline navigation.
+        </div>
+      </div>
+    );
 
-  return <div ref={containerRef} className="h-full w-full overflow-hidden bg-white" />;
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-[linear-gradient(180deg,rgba(255,253,249,0.98),rgba(250,245,239,0.86))]">
+      <div className="border-b border-[color:var(--line)] px-4 py-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="panel-title">Timeline</div>
+            <h2 className="mt-2 text-xl font-semibold">Case chronology</h2>
+            <p className="mt-1 max-w-xl text-sm leading-6 text-[color:var(--muted)]">
+              Start here to understand the flow of events, then jump into supporting documents or
+              related participants.
+            </p>
+          </div>
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search events, dates, or participants"
+              className="min-w-0 flex-1 rounded-xl border border-[color:var(--line)] bg-white px-3 py-2 text-sm"
+            />
+            <span className="rounded-full border border-[color:var(--line)] bg-white px-3 py-1 text-xs text-[color:var(--muted)]">
+              {filteredEvents.length} of {events.length} events
+            </span>
+          </div>
+        </div>
+      </div>
+      <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[330px_1fr]">
+        <div className="overflow-y-auto border-b border-[color:var(--line)] bg-[#f7efe4] xl:border-b-0 xl:border-r">
+          {filteredEvents.length === 0 ? (
+            <div className="p-5 text-sm text-[color:var(--muted)]">No events match this filter.</div>
+          ) : (
+            <ul className="divide-y divide-[color:var(--line)]">
+              {filteredEvents.map((event) => {
+                const selected = event.id === selectedEventId;
+                return (
+                  <li key={event.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedEventId(event.id);
+                        onEventSelect(event);
+                      }}
+                      className={
+                        selected
+                          ? "w-full bg-[linear-gradient(135deg,#2d2520,#1f1a16)] px-4 py-4 text-left text-white"
+                          : "w-full px-4 py-4 text-left hover:bg-white/70"
+                      }
+                    >
+                      <div className="text-[11px] uppercase tracking-[0.18em] opacity-70">
+                        {formatEventDate(event.occurred_at)}
+                      </div>
+                      <div className="mt-2 text-sm font-medium leading-6">{event.description}</div>
+                      {event.participants.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {event.participants.map((participant) => (
+                            <span
+                              key={participant.id}
+                              className={
+                                selected
+                                  ? "rounded-full border border-white/20 px-2.5 py-1 text-[11px]"
+                                  : "rounded-full border border-[color:var(--line)] bg-white px-2.5 py-1 text-[11px] text-[color:var(--muted)]"
+                              }
+                            >
+                              {participant.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+        <div className="grid min-h-0 grid-rows-[minmax(220px,1fr)_auto]">
+          <div ref={containerRef} className="min-h-[260px] overflow-hidden px-3 py-2 sm:px-4" />
+          <div className="border-t border-[color:var(--line)] bg-white/85 px-4 py-4">
+            {selectedEventId ? (
+              (() => {
+                const event = events.find((candidate) => candidate.id === selectedEventId);
+                if (!event) return null;
+                return (
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <div className="panel-title">
+                        Selected Event
+                      </div>
+                      <div className="mt-2 text-base font-semibold">{event.description}</div>
+                      <div className="mt-1 text-sm text-[color:var(--muted)]">
+                        {formatEventDate(event.occurred_at)}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {event.participants.map((participant) => (
+                        <button
+                          key={participant.id}
+                          type="button"
+                          onClick={() => onParticipantSelect(participant.id)}
+                          className="rounded-full border border-[color:var(--line)] bg-[color:var(--bg-soft)] px-3 py-1.5 text-xs text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+                        >
+                          {participant.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()
+            ) : (
+              <div className="text-sm text-[color:var(--muted)]">
+                Select an event to inspect its evidence.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function formatEventDate(date: string): string {
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return date;
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }

@@ -38,8 +38,28 @@ def read_case_events(case_id: str) -> list[dict]:
             "OPTIONAL MATCH (p:Entity)-[:PARTICIPATED_IN]->(ev) "
             "RETURN ev.event_id AS id, ev.description AS description, "
             "ev.occurred_at AS occurred_at, ev.provenance AS provenance, "
-            "collect(p.canonical_id) AS participant_ids "
+            "collect(p.canonical_id) AS participant_ids, "
+            "collect(p.canonical_name) AS participant_names "
             "ORDER BY ev.occurred_at",
             cid=case_id,
         )
-        return [dict(r) for r in result]
+        events: list[dict] = []
+        for row in result:
+            participant_ids = row["participant_ids"] or []
+            participant_names = row["participant_names"] or []
+            participants = [
+                {"id": pid, "name": name}
+                for pid, name in zip(participant_ids, participant_names, strict=False)
+                if pid
+            ]
+            events.append(
+                {
+                    "id": row["id"],
+                    "description": row["description"],
+                    "occurred_at": row["occurred_at"],
+                    "provenance": row["provenance"],
+                    "participant_ids": [p["id"] for p in participants],
+                    "participants": participants,
+                }
+            )
+        return events

@@ -81,9 +81,25 @@ export interface Contradiction {
   rank_score: number;
 }
 
+export interface GraphEntity {
+  id: string;
+  type: EntityType;
+  name: string;
+  mention_texts: string[];
+  provenance: string[];
+}
+
+export interface GraphRelation {
+  subject_id: string;
+  object_id: string;
+  type: RelationType;
+  qualifiers: Record<string, string>;
+  provenance: string[];
+}
+
 export interface GraphResponse {
-  entities: Entity[];
-  relations: Relation[];
+  entities: GraphEntity[];
+  relations: GraphRelation[];
   events: Event[];
 }
 
