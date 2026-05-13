@@ -1,256 +1,165 @@
 # User Test Plan
 
-This is the handout another team should read while going through our midpoint demo. It is designed to be easy to follow without prior knowledge of the product.
-
 ## What You Are Testing
 
-You are testing an AI-powered legal discovery prototype.
+You are testing an AI-powered legal discovery prototype using the preloaded Enron / Raptor II demo case.
 
-This product is meant to help a user:
+The product is intended to help users:
 
-- ingest legal case documents
-- identify important people, organizations, claims, and events
-- view a case timeline
-- inspect source evidence directly in the underlying documents
-- find contradictions across multiple documents
-
-For this test, you will use a preloaded Enron / Raptor II case that already contains emails, deposition excerpts, and an internal memo.
+- ingest legal documents
+- inspect extracted entities and events
+- review contradictions across documents
+- jump back to grounded source evidence
 
 ## Time
 
-Please plan for about `5-8 minutes`.
+Plan for about `5-8 minutes`.
 
 ## Before You Begin
 
-The team running the demo should already have the app open to the Enron demo case.
+The team should already have the app open to `http://localhost:3000/case/demo`.
 
-If you are starting from the home page, click:
+If you start from the home page, click `Open Enron demo case`.
 
-- `Open Enron demo case →`
+## How To Use This Handout
 
-Once the case loads, you should see:
+For each scenario:
 
-- a header with `Documents`, `Entities`, and `Contradictions`
-- an `Ingestion` section with an `Upload documents` button
-- a `Workspace` tab
-- a `Contradictions` tab
-- a timeline
-- a source document panel
-- a graph panel
+1. Read one instruction sentence.
+2. Do that action in the app.
+3. Fill in the row in the log before moving on.
 
-## Instructions
+Default roles:
 
-As you go through the demo, please think out loud.
+- the tester fills in the worksheet answers
+- the moderator can write on the tester's behalf if the tester prefers to speak out loud
 
-Please say:
+## Tester Info
 
-- what you think the product is doing
-- what feels easy
-- what feels confusing
-- whether the results feel believable
+| Field | Your answer |
+| --- | --- |
+| Name or ID |  |
+| Date |  |
+| Background |  |
+| Prior experience with legal tools |  |
 
-If you get stuck, try to continue on your own first. A teammate may step in if needed.
+## Scenario 1: Get Oriented
 
-## Step-By-Step Demo Flow
+Read the case title at the top of the page.
 
-### 1. Get Oriented
+Read the `Documents`, `Entities`, and `Contradictions` counts.
 
-Start on the Enron demo case workspace.
+Say what you think this product is for based only on the first screen.
 
-Please do the following:
+| Step | What you did | What was clear? | What was confusing? | Confidence 1-5 |
+| --- | --- | --- | --- | --- |
+| Read the title and counts |  |  |  |  |
+| Explain what the product seems to do |  |  |  |  |
 
-1. Look at the case title and the summary cards at the top of the page.
-2. Read the `Documents`, `Entities`, and `Contradictions` counts.
-3. Briefly explain what you think this product is for based only on this screen.
-
-### 2. Explore the Timeline
+## Scenario 2: Review Evidence From the Timeline
 
 Stay in the `Workspace` tab.
 
-Please do the following:
+Find the timeline.
 
-1. Find the timeline.
-2. Click on one event that looks important.
-3. Watch to see what changes elsewhere on the page.
-4. Explain what you think that event means.
+Click one event that looks important.
 
-### 3. View Source Evidence
+Look for changes in the source document panel.
 
-After selecting a timeline event, look at the source document panel.
+Read the excerpt that appears.
 
-Please do the following:
+Say what evidence this event and excerpt seem to show.
 
-1. Find the source excerpt shown in the document viewer.
-2. Read the excerpt.
-3. Explain what evidence this document seems to provide.
+| Step | What you did | What was clear? | What was confusing? | Confidence 1-5 |
+| --- | --- | --- | --- | --- |
+| Found the timeline |  |  |  |  |
+| Clicked one event |  |  |  |  |
+| Looked at the source excerpt |  |  |  |  |
+| Explained what the evidence means |  |  |  |  |
 
-### 4. Inspect the Graph
+## Scenario 3: Inspect the Graph
 
-Look at the graph panel in the workspace.
+Look at the graph panel.
 
-Please do the following:
+Click one person or organization.
 
-1. Click on one person or organization in the graph.
-2. See whether the selected node changes the context elsewhere on the page.
-3. Explain who or what that node appears to represent.
-4. If useful, click a second node and compare what you learn.
+Describe who or what that node seems to represent.
 
-### 5. Review a Contradiction
+If helpful, click a second node and compare the two.
 
-Now switch to the `Contradictions` tab.
+Say whether the graph helped you understand the case.
 
-Please do the following:
+| Step | What you did | What was clear? | What was confusing? | Confidence 1-5 |
+| --- | --- | --- | --- | --- |
+| Clicked one graph node |  |  |  |  |
+| Interpreted the selected entity |  |  |  |  |
+| Compared a second node, if used |  |  |  |  |
+| Judged whether the graph was useful |  |  |  |  |
 
-1. Click the `Contradictions` tab.
-2. Read the contradiction cards that appear.
-3. Click `Open` on one contradiction.
-4. Compare the conflicting claims shown side by side.
-5. Explain, in your own words, what the contradiction is.
+## Scenario 4: Review a Contradiction
 
-### 6. Jump Back to the Evidence
+Click the `Contradictions` tab.
 
-Stay inside the contradiction you opened.
+Read the contradiction cards.
 
-Please do the following:
+Open one contradiction.
 
-1. Click one of the claim cards or the `Open source excerpt` action.
-2. Confirm that the app returns you to the relevant document evidence.
-3. Read the excerpt.
-4. Explain whether the contradiction feels convincing based on the source text.
+Compare the conflicting claims.
 
-### 7. Try Document Ingestion
+Say what the contradiction is in your own words.
 
-If the team running the demo gives you a sample file, test the upload flow.
+Click the source evidence for one claim.
 
-Please do the following:
+Say whether the contradiction feels believable after reading the source text.
 
-1. Find the `Ingestion` section.
-2. Click `Upload documents`.
-3. Select the provided file.
-4. Watch the progress area while the case reprocesses.
-5. When processing finishes, look to see whether the workspace updates.
+| Step | What you did | What was clear? | What was confusing? | Confidence 1-5 |
+| --- | --- | --- | --- | --- |
+| Opened the contradictions tab |  |  |  |  |
+| Opened one contradiction |  |  |  |  |
+| Compared the claims |  |  |  |  |
+| Jumped to source evidence |  |  |  |  |
+| Judged whether the contradiction felt believable |  |  |  |  |
 
-If no file is provided, skip this step.
+## Scenario 5: Try Document Ingestion
 
-### 8. Give Your Final Reaction
+Find the `Ingestion` section.
 
-When you finish, please answer these questions:
+Click `Upload documents`.
 
-1. What do you think this product does best?
-2. What was the most confusing part?
-3. Which view helped you the most: timeline, graph, source document, or contradictions?
-4. Did the linked source evidence make the results feel trustworthy?
-5. Would this be useful in a real legal review workflow? Why or why not?
+Select the sample file provided by the moderator.
 
-## Team Notes
+Watch the progress area while the case updates.
 
-This section is for our team. It keeps the handout aligned with the assignment requirements.
+Say whether the upload flow made sense.
 
-## Product and Demo Setup
+If no sample file is provided, write `Skipped`.
 
-- product: AI-powered legal discovery prototype
-- demo case: Enron / Raptor II seeded legal case
-- supported demo document types: emails, deposition excerpts, internal memo, and upload support for PDFs/text-based files
-- midpoint demo mode: `DEMO_OFFLINE_MODE=true`
+| Step | What you did | What was clear? | What was confusing? | Confidence 1-5 |
+| --- | --- | --- | --- | --- |
+| Found the ingestion area |  |  |  |  |
+| Started an upload or marked skipped |  |  |  |  |
+| Watched the progress/update behavior |  |  |  |  |
+| Judged whether the flow made sense |  |  |  |  |
 
-This setup matches our current stable demo path and avoids dependence on live LLM calls during midpoint testing.
+## Final Feedback
 
-## OKRs and KPIs Covered by This Test
+Answer these after all scenarios are complete.
 
-### OKRs
+| Question | Your answer |
+| --- | --- |
+| What part of the product was most useful? |  |
+| What part was most confusing? |  |
+| Which single view would you keep: timeline, graph, source document, or contradictions? |  |
+| Did the linked source evidence make the results feel trustworthy? Why or why not? |  |
+| Would this be useful in a real legal workflow? Why or why not? |  |
 
-Objective:
-Build a working AI-powered legal discovery prototype that accurately constructs a structured knowledge graph of entities and works on logically complex cases.
+## Moderator Notes
 
-Current status notes:
+Use this space while the tester works.
 
-- objective score: `0.5`
-- current strength: the seeded Enron case is usable and demonstrates the intended workflow
-- current risk: robustness on harder cases is still limited
-
-Key results exercised by this test:
-
-- KR1: ingest and process a real legal dataset across multiple document types
-- KR2: extract and resolve entities with high accuracy across ingested documents
-- KR3: build and display a visual knowledge graph that surfaces at least one contradiction
-
-### KPIs
-
-- Entity Extraction Accuracy
-  Target: `>= 80%`
-  Midpoint use: collect trust feedback on entities and compare visible demo behavior against known seeded examples.
-- Contradiction Detection Rate
-  Target: `>= 80%`
-  Midpoint use: verify whether testers can find and understand surfaced contradictions.
-- Document Processing Speed
-  Target: batches larger than 10 documents process in under 1 minute
-  Midpoint use: record upload timing and waiting friction, while noting that the seeded demo corpus is smaller than the final KPI scenario.
-
-## Assignment Spec Coverage
-
-This test plan covers the required assignment areas as follows:
-
-- Basic required functionality
-  Covered by the guided flow through case loading, timeline use, source evidence, graph exploration, contradictions, and document upload.
-- UI comparisons
-  Covered by the closing feedback question asking which primary view is most useful, plus moderator follow-up comparing timeline-first versus contradiction-first workflows.
-- Core feature and benefit evaluation
-  Covered by asking testers to move from an event to evidence and from a contradiction back to source text, then explain whether the result is useful and trustworthy.
-- Performance testing
-  Covered by observing the upload/reprocessing flow and recording whether waiting or refresh behavior is confusing.
-- Simulated long-term usage
-  Covered by using the preloaded Enron case as a fast-forwarded workspace that already contains accumulated legal materials.
-
-## Feedback Mechanism
-
-Use one consistent feedback medium:
-
-- [Feedback-Log.md](/Users/venuchannarayappa/Desktop/spr26-Team-15/docs/wiki/Feedback-Log.md)
-
-For each tester, record:
-
-- tester name or identifier
-- tester background
-- which steps were completed
-- where the tester hesitated
-- exact confusion quotes when possible
-- issue type
-- severity
-- linked OKR or KPI
-- recommended next action
-
-## Moderator Guidance
-
-Use this short welcome:
-
-“Thanks for testing our legal discovery prototype. Please think out loud as you use it. We are testing the product, not you, so confusion and criticism are very useful.”
-
-Default rule:
-
-- let the tester work independently
-
-Intervene only if:
-
-- they are blocked for roughly 45-60 seconds
-- the app is clearly broken
-- they misunderstood the task badly enough that the rest of the session would stop being useful
-
-Minimal hints:
-
-- `Try clicking an event in the timeline.`
-- `Open one contradiction and compare the claims.`
-- `Click the source excerpt to jump back to the document.`
-
-## Midpoint Logistics
-
-For the midpoint review, this plan should be:
-
-- linked from the team wiki
-- visible on a laptop or external display near the tester
-- available in printed form if needed
-
-Expected outputs after testing:
-
-- a completed feedback log
-- an actionable issue list or groomed backlog
-- evidence about which part of the product delivers the strongest value during the demo
+| Time or step | Observation | Exact quote | Severity | Follow-up action |
+| --- | --- | --- | --- | --- |
+|  |  |  |  |  |
+|  |  |  |  |  |
+|  |  |  |  |  |
+|  |  |  |  |  |
