@@ -7,6 +7,7 @@ import { createCase, getCase, parseProvenance } from "@/lib/api";
 import type { CaseSummary, GraphEntity } from "@/lib/types";
 import { ContradictionsPanel } from "@/components/contradictions/ContradictionsPanel";
 import { DocPane } from "@/components/document/DocPane";
+import { EntityProfileDrawer } from "@/components/entity/EntityProfileDrawer";
 import { GraphView } from "@/components/graph/GraphView";
 import { Timeline } from "@/components/timeline/Timeline";
 import { UploadPanel } from "@/components/upload/UploadPanel";
@@ -20,6 +21,7 @@ export default function CaseWorkspacePage() {
   const [summary, setSummary] = useState<CaseSummary | null>(null);
   const [tab, setTab] = useState<Tab>("workspace");
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  const [drawerEntityId, setDrawerEntityId] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<{
     docId: string;
     start: number;
@@ -63,6 +65,7 @@ export default function CaseWorkspacePage() {
 
   const handleEntitySelect = useCallback((id: string, entity: GraphEntity | null) => {
     setSelectedEntityId(id);
+    setDrawerEntityId(id);
     const rawProv = entity?.provenance?.[0];
     if (rawProv) {
       const parsed = parseProvenance(rawProv);
@@ -71,6 +74,16 @@ export default function CaseWorkspacePage() {
         setHighlight({ docId: parsed.docId, start: parsed.start, end: parsed.end });
       }
     }
+  }, []);
+
+  const handleParticipantSelect = useCallback((id: string) => {
+    setSelectedEntityId(id);
+    setDrawerEntityId(id);
+  }, []);
+
+  const handleDrawerEntityNavigate = useCallback((id: string) => {
+    setSelectedEntityId(id);
+    setDrawerEntityId(id);
   }, []);
 
   const handleClaimSelect = useCallback((docId: string, start: number, end: number) => {
@@ -166,7 +179,7 @@ export default function CaseWorkspacePage() {
                   caseId={caseId}
                   refreshToken={refreshKey}
                   onEventSelect={handleEventSelect}
-                  onParticipantSelect={setSelectedEntityId}
+                  onParticipantSelect={handleParticipantSelect}
                 />
               </section>
               <section className="workspace-card-strong min-h-[320px] overflow-hidden rounded-[24px]">
@@ -198,6 +211,14 @@ export default function CaseWorkspacePage() {
           )}
         </div>
       </div>
+      <EntityProfileDrawer
+        caseId={caseId}
+        entityId={drawerEntityId}
+        refreshToken={refreshKey}
+        onClose={() => setDrawerEntityId(null)}
+        onJumpToProvenance={handleClaimSelect}
+        onEntityNavigate={handleDrawerEntityNavigate}
+      />
     </main>
   );
 }
