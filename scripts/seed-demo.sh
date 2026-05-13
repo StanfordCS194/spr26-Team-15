@@ -25,6 +25,7 @@ export PYTHONPATH="$REPO_ROOT/backend:${PYTHONPATH:-}"
 
 python - <<PY
 import os, sys, json, pathlib
+from app.config import get_settings
 from app.db import init_schema, get_conn
 from app.demo_seed import populate_demo_case
 from app.pipeline import run_pipeline_for_case
@@ -66,8 +67,11 @@ for doc in manifest["documents"]:
     ingested += 1
 
 print(f"Ingested {ingested} documents. Running pipeline...")
-try:
-    stats = run_pipeline_for_case(CASE_ID, wipe_first=True)
+settings = get_settings()
+if settings.demo_offline_mode:
+    stats = populate_demo_case(CASE_ID)
+    if stats is None:
+        raise RuntimeError("offline demo data could not be populated")
     print(json.dumps({
         "case_id": stats.case_id,
         "documents_processed": stats.documents_processed,
@@ -79,30 +83,46 @@ try:
         "events_extracted": stats.events_extracted,
         "entity_clusters": stats.entity_clusters,
         "contradictions_found": stats.contradictions_found,
-        "input_tokens": stats.total_input_tokens,
-        "output_tokens": stats.total_output_tokens,
-        "cache_read_input_tokens": stats.cache_read_input_tokens,
-        "cache_creation_input_tokens": stats.cache_creation_input_tokens,
+        "mode": "offline-demo",
     }, indent=2))
-except Exception as exc:
-    print(f"Live extraction unavailable: {exc}", file=sys.stderr)
-    demo_stats = populate_demo_case(CASE_ID)
-    if demo_stats is None:
-        raise
-    stats = demo_stats
-    print(json.dumps({
-        "case_id": stats.case_id,
-        "documents_processed": stats.documents_processed,
-        "chunks_processed": stats.chunks_processed,
-        "chunks_failed": stats.chunks_failed,
-        "entities_extracted": stats.entities_extracted,
-        "relations_extracted": stats.relations_extracted,
-        "claims_extracted": stats.claims_extracted,
-        "events_extracted": stats.events_extracted,
-        "entity_clusters": stats.entity_clusters,
-        "contradictions_found": stats.contradictions_found,
-        "mode": "offline-demo-fallback",
-    }, indent=2))
+else:
+    try:
+        stats = run_pipeline_for_case(CASE_ID, wipe_first=True)
+        print(json.dumps({
+            "case_id": stats.case_id,
+            "documents_processed": stats.documents_processed,
+            "chunks_processed": stats.chunks_processed,
+            "chunks_failed": stats.chunks_failed,
+            "entities_extracted": stats.entities_extracted,
+            "relations_extracted": stats.relations_extracted,
+            "claims_extracted": stats.claims_extracted,
+            "events_extracted": stats.events_extracted,
+            "entity_clusters": stats.entity_clusters,
+            "contradictions_found": stats.contradictions_found,
+            "input_tokens": stats.total_input_tokens,
+            "output_tokens": stats.total_output_tokens,
+            "cache_read_input_tokens": stats.cache_read_input_tokens,
+            "cache_creation_input_tokens": stats.cache_creation_input_tokens,
+        }, indent=2))
+    except Exception as exc:
+        print(f"Live extraction unavailable: {exc}", file=sys.stderr)
+        demo_stats = populate_demo_case(CASE_ID)
+        if demo_stats is None:
+            raise
+        stats = demo_stats
+        print(json.dumps({
+            "case_id": stats.case_id,
+            "documents_processed": stats.documents_processed,
+            "chunks_processed": stats.chunks_processed,
+            "chunks_failed": stats.chunks_failed,
+            "entities_extracted": stats.entities_extracted,
+            "relations_extracted": stats.relations_extracted,
+            "claims_extracted": stats.claims_extracted,
+            "events_extracted": stats.events_extracted,
+            "entity_clusters": stats.entity_clusters,
+            "contradictions_found": stats.contradictions_found,
+            "mode": "offline-demo-fallback",
+        }, indent=2))
 
 expected_min_entities = manifest.get("expected_entity_minimum", 0)
 expected_contradictions = len(manifest.get("expected_contradictions", []))
