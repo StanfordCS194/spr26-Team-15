@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     groq_api_key: str = Field(default="", alias="GROQ_API_KEY")
 
     llm_provider: str = Field(default="anthropic", alias="LLM_PROVIDER")
+    demo_offline_mode: bool = Field(default=False, alias="DEMO_OFFLINE_MODE")
 
     neo4j_uri: str = Field(default="bolt://localhost:7687", alias="NEO4J_URI")
     neo4j_user: str = Field(default="neo4j", alias="NEO4J_USER")
