@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { getCase, getEvents, listContradictions, listDocuments } from "@/lib/api";
+import { createReportFilename, formatCaseReport } from "@/lib/exportReport";
 
 interface Props {
   caseId: string;
@@ -31,43 +32,14 @@ export function ExportReportButton({ caseId }: Props) {
         listContradictions(caseId),
       ]);
 
-      const report = [
-        `# Case Report: ${summary.name}`,
-        "",
-        `Generated: ${new Date().toLocaleString()}`,
-        `Case ID: ${summary.id}`,
-        "",
-        "## Summary",
-        `- Documents: ${summary.document_count}`,
-        `- Entities: ${summary.entity_count}`,
-        `- Contradictions: ${summary.contradiction_count}`,
-        "",
-        "## Documents",
-        ...(documents.length > 0
-          ? documents.map((doc) => `- ${doc.filename} (${doc.mime_type}, ${doc.char_length} chars)`)
-          : ["- None"]),
-        "",
-        "## Timeline",
-        ...(events.length > 0
-          ? events.map((event, index) => `${index + 1}. ${event.occurred_at}: ${event.description}`)
-          : ["No events available."]),
-        "",
-        "## Contradictions",
-        ...(contradictions.length > 0
-          ? contradictions.flatMap((contradiction) => [
-              `### ${contradiction.subject_entity_id} · ${contradiction.predicate}`,
-              `Rank: ${contradiction.rank_score.toFixed(2)}`,
-              contradiction.explanation,
-              ...contradiction.claims.map(
-                (claim) =>
-                  `- ${claim.value} (${claim.source_doc_id}, chars ${claim.char_start}-${claim.char_end})`,
-              ),
-              "",
-            ])
-          : ["No contradictions detected."]),
-      ].join("\n");
+      const report = formatCaseReport({
+        summary,
+        documents,
+        events,
+        contradictions,
+      });
 
-      downloadText(`${caseId}-report.md`, report);
+      downloadText(createReportFilename(summary.id || caseId), report);
     } catch (error) {
       window.alert(`Export failed: ${String(error)}`);
     } finally {
@@ -80,7 +52,7 @@ export function ExportReportButton({ caseId }: Props) {
       type="button"
       onClick={handleExport}
       disabled={pending}
-      className="rounded-md border border-neutral-300 px-3 py-1 text-xs text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
+      className="rounded-full border border-[color:var(--line-strong)] bg-white/80 px-4 py-2 text-sm text-[color:var(--text)] transition hover:translate-y-[-1px] hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
     >
       {pending ? "Exporting…" : "Export report"}
     </button>
