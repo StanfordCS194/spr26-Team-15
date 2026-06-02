@@ -34,7 +34,8 @@ def list_contradictions(case_id: str) -> list[ContradictionDetail]:
     with get_conn() as conn, conn.cursor() as cur:
         subject_names = _load_subject_names(case_id)
         cur.execute(
-            "SELECT id, subject_entity_id, predicate, conflicting_claim_ids, explanation, rank_score "
+            "SELECT id, subject_entity_id, subject_label, predicate, conflicting_claim_ids, "
+            "explanation, rank_score "
             "FROM contradictions WHERE case_id = %s ORDER BY rank_score DESC",
             (case_id,),
         )
@@ -70,7 +71,10 @@ def list_contradictions(case_id: str) -> list[ContradictionDetail]:
                 ContradictionDetail(
                     id=c["id"],
                     subject_entity_id=c["subject_entity_id"],
-                    subject_entity_name=subject_names.get(c["subject_entity_id"]),
+                    subject_entity_name=(
+                        subject_names.get(c["subject_entity_id"])
+                        or (c["subject_label"] or None)
+                    ),
                     predicate=c["predicate"],
                     explanation=c["explanation"],
                     rank_score=float(c["rank_score"]),

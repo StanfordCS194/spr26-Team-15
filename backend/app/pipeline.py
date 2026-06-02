@@ -5,9 +5,15 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
-from app.contradictions.detector import ContradictionRecord, detect_contradictions
+from app.contradictions.detector import (
+    ContradictionRecord,
+    detect_contradictions,
+    event_date_claims,
+    suppress_event_subsumed_contradictions,
+    template_explanation,
+)
 from app.db import get_conn
 from app.extraction.client import ExtractionClient, ExtractionValidationError
 from app.graph.client import get_driver
@@ -22,7 +28,11 @@ from app.graph.writer import (
     wipe_case,
 )
 from app.models.extraction import Claim, Entity, Event, ExtractionResult, Relation
-from app.resolution.resolver import build_local_to_canonical, resolve_entities
+from app.resolution.resolver import (
+    build_local_to_canonical,
+    resolve_entities,
+    resolve_events,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -191,9 +201,40 @@ def run_pipeline_for_case(
         )
 
     # --- Contradictions ---
-    contradictions = detect_contradictions(all_claims, local_to_canonical=local_to_canonical)
+    # Resolve events (ignoring date) so the same meeting dated inconsistently across documents
+    # is recognised as one event, then turn each event into an `occurred_on` claim. These flow
+    # through the same detector as ordinary claims, so a disputed event date surfaces once at
+    # the event level instead of as a redundant conflict per attendee.
+    event_clusters = resolve_events([(ev.id, ev.description) for ev in all_events])
+    event_local_to_canonical = {
+        member: c.canonical_id for c in event_clusters for member in c.member_ids
+    }
+    event_labels = {c.canonical_id: c.canonical_description for c in event_clusters}
+    synthetic_claims = event_date_claims(all_events, event_local_to_canonical)
+
+    detect_input = all_claims + synthetic_claims
+    raw_contradictions = detect_contradictions(
+        detect_input, local_to_canonical=local_to_canonical
+    )
+
+    claims_by_id = {c.id: c for c in detect_input}
+    contradictions = suppress_event_subsumed_contradictions(raw_contradictions, claims_by_id)
+    # Attach a human-readable subject (for events) and a short explanation for the UI.
+    contradictions = [
+        replace(
+            c,
+            subject_label=event_labels.get(c.subject_entity_id, c.subject_label),
+            explanation=template_explanation(
+                replace(c, subject_label=event_labels.get(c.subject_entity_id, c.subject_label)),
+                claims_by_id,
+            ),
+        )
+        for c in contradictions
+    ]
     stats.contradictions_found = len(contradictions)
-    _persist_claims_and_contradictions(case_id, all_claims, local_to_canonical, contradictions)
+    _persist_claims_and_contradictions(
+        case_id, detect_input, local_to_canonical, contradictions
+    )
 
     return stats
 
@@ -262,17 +303,18 @@ def _persist_claims_and_contradictions(
             )
         for contra in contradictions:
             cur.execute(
-                "INSERT INTO contradictions (id, case_id, subject_entity_id, predicate, "
-                "conflicting_claim_ids, explanation, rank_score) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s) "
+                "INSERT INTO contradictions (id, case_id, subject_entity_id, subject_label, "
+                "predicate, conflicting_claim_ids, explanation, rank_score) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) "
                 "ON CONFLICT (id) DO NOTHING",
                 (
                     contra.id,
                     case_id,
                     contra.subject_entity_id,
+                    contra.subject_label,
                     contra.predicate,
                     json.dumps(contra.conflicting_claim_ids),
-                    "",  # LLM-generated explanation is a follow-up; leave empty for v1
+                    contra.explanation,
                     contra.rank_score,
                 ),
             )

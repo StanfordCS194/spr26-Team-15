@@ -188,3 +188,89 @@ def build_local_to_canonical(clusters: list[ResolvedCluster]) -> dict[str, str]:
         for local_id in cluster.member_ids:
             out[local_id] = cluster.canonical_id
     return out
+
+
+# --- Event resolution -------------------------------------------------------------------
+# The same real-world event (e.g. "the Raptor II finance committee meeting") is described
+# differently across documents and — critically — sometimes dated differently. We cluster
+# events by description similarity while IGNORING the date, so a meeting dated March 12 in
+# three documents and March 15 in a fourth resolves to ONE event whose date is in dispute.
+
+# Single-linkage cutoff for event descriptions. Tuned to sit above the similarity of
+# boilerplate-heavy-but-distinct events (e.g. two depositions that share "Deposition of … taken
+# in case CV-…" but name different people) and below the similarity of genuine re-tellings of
+# the same event. The same-meeting cluster is held together by several strong links (0.86–1.0),
+# so it stays intact even if a terse paraphrase drops out.
+EVENT_DESC_THRESHOLD = 82.0
+
+_ALPHA_TOKENS = re.compile(r"[a-z]+")
+
+
+@dataclass(frozen=True)
+class ResolvedEventCluster:
+    canonical_id: str
+    canonical_description: str  # the fullest member description, shown to users
+    member_ids: tuple[str, ...]
+
+
+def normalize_event_description(description: str) -> str:
+    """Alphabetic-token key for fuzzy event matching.
+
+    Drops digits and punctuation so dates/amounts ("March 15", "$2.5M") don't drive matching —
+    we want events grouped by *what happened*, not *when* (the date is exactly what may conflict).
+    """
+    return " ".join(_ALPHA_TOKENS.findall(description.lower()))
+
+
+def _event_cluster_id(normalized_key: str) -> str:
+    h = hashlib.sha1(f"event|{normalized_key}".encode()).hexdigest()[:16]
+    return f"evt_{h}"
+
+
+def resolve_events(
+    events: Iterable[tuple[str, str]],
+    threshold: float = EVENT_DESC_THRESHOLD,
+) -> list[ResolvedEventCluster]:
+    """Cluster events by description similarity, ignoring dates.
+
+    Args:
+        events: iterable of (local_event_id, description) pairs.
+        threshold: single-linkage token_set_ratio cutoff (0-100).
+
+    Returns one ResolvedEventCluster per distinct underlying event, each with a stable
+    canonical_id derived from the fullest member description.
+    """
+    items = list(events)
+    if not items:
+        return []
+
+    norm = [normalize_event_description(desc) for _eid, desc in items]
+    parent = list(range(len(items)))
+
+    for i in range(len(items)):
+        if not norm[i]:
+            continue
+        for j in range(i + 1, len(items)):
+            if not norm[j] or _find(parent, i) == _find(parent, j):
+                continue
+            if fuzz.token_set_ratio(norm[i], norm[j]) >= threshold:
+                _union(parent, i, j)
+
+    groups: dict[int, list[int]] = {}
+    for i in range(len(items)):
+        groups.setdefault(_find(parent, i), []).append(i)
+
+    clusters: list[ResolvedEventCluster] = []
+    for idxs in groups.values():
+        # Representative = longest description (usually the most complete phrasing).
+        rep_idx = max(idxs, key=lambda i: len(items[i][1]))
+        rep_desc = items[rep_idx][1]
+        cid = _event_cluster_id(norm[rep_idx] or items[rep_idx][0])
+        clusters.append(
+            ResolvedEventCluster(
+                canonical_id=cid,
+                canonical_description=rep_desc,
+                member_ids=tuple(items[i][0] for i in idxs),
+            )
+        )
+    return clusters
