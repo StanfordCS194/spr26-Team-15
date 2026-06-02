@@ -7,6 +7,7 @@ import json
 import logging
 from dataclasses import dataclass, replace
 
+from app.config import get_settings
 from app.contradictions.detector import (
     ContradictionRecord,
     detect_contradictions,
@@ -219,14 +220,44 @@ def run_pipeline_for_case(
 
     claims_by_id = {c.id: c for c in detect_input}
     contradictions = suppress_event_subsumed_contradictions(raw_contradictions, claims_by_id)
-    # Attach a human-readable subject (for events) and a short explanation for the UI.
+
+    # Optional additive semantic pass for cross-predicate / cross-value-type conflicts the
+    # deterministic detector can't see (gated off by default).
+    settings = get_settings()
+    if settings.semantic_contradictions_enabled:
+        from app.contradictions.semantic import (
+            LLMAdjudicator,
+            detect_semantic_contradictions,
+            merge_contradictions,
+        )
+        from app.llm import make_provider
+
+        adjudicator = LLMAdjudicator(
+            make_provider(settings), model=settings.contradiction_explanation_model
+        )
+        semantic = detect_semantic_contradictions(
+            detect_input,
+            adjudicator,
+            local_to_canonical=local_to_canonical,
+            max_pairs=settings.semantic_contradictions_max_pairs,
+        )
+        contradictions = merge_contradictions(contradictions, semantic)
+
+    # Attach a human-readable subject (for events) and a short explanation for the UI. Keep any
+    # explanation a pass already produced (e.g. the semantic adjudicator's); else use a template.
     contradictions = [
         replace(
             c,
             subject_label=event_labels.get(c.subject_entity_id, c.subject_label),
-            explanation=template_explanation(
-                replace(c, subject_label=event_labels.get(c.subject_entity_id, c.subject_label)),
-                claims_by_id,
+            explanation=(
+                c.explanation
+                or template_explanation(
+                    replace(
+                        c,
+                        subject_label=event_labels.get(c.subject_entity_id, c.subject_label),
+                    ),
+                    claims_by_id,
+                )
             ),
         )
         for c in contradictions
