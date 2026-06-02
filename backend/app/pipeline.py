@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
+from collections import Counter
 from dataclasses import dataclass, replace
 
 from app.config import get_settings
@@ -191,26 +191,44 @@ def run_pipeline_for_case(
             continue  # dangling refs were flagged upstream; skip defensively
         upsert_relation(driver, resolve_relation_for_write(r, subj, obj, case_id))
 
-    for ev in all_events:
-        participants = [
-            local_to_canonical[p] for p in ev.participant_ids if p in local_to_canonical
-        ]
-        event_canonical_id = _event_canonical_id(ev)
-        upsert_event(
-            driver,
-            resolve_event_for_write(ev, event_canonical_id, participants, case_id),
-        )
-
-    # --- Contradictions ---
-    # Resolve events (ignoring date) so the same meeting dated inconsistently across documents
-    # is recognised as one event, then turn each event into an `occurred_on` claim. These flow
-    # through the same detector as ordinary claims, so a disputed event date surfaces once at
-    # the event level instead of as a redundant conflict per attendee.
+    # Resolve events once (ignoring date) — reused for timeline dedup AND event-date
+    # contradiction detection below. The same real event told several ways collapses to one
+    # cluster; its date is whatever's in dispute.
     event_clusters = resolve_events([(ev.id, ev.description) for ev in all_events])
     event_local_to_canonical = {
         member: c.canonical_id for c in event_clusters for member in c.member_ids
     }
     event_labels = {c.canonical_id: c.canonical_description for c in event_clusters}
+    events_by_id = {ev.id: ev for ev in all_events}
+    # Representative timeline date per cluster = most common member date (ties → earliest).
+    event_rep_date: dict[str, str] = {}
+    for cluster in event_clusters:
+        dates = [
+            events_by_id[m].occurred_at for m in cluster.member_ids if events_by_id[m].occurred_at
+        ]
+        if dates:
+            counts = Counter(dates)
+            top = max(counts.values())
+            event_rep_date[cluster.canonical_id] = min(d for d, n in counts.items() if n == top)
+
+    # Write one deduped timeline node per resolved event cluster (provenance accumulates across
+    # the cluster's members; participants are unioned by the idempotent upsert).
+    for ev in all_events:
+        cid = event_local_to_canonical[ev.id]
+        participants = [
+            local_to_canonical[p] for p in ev.participant_ids if p in local_to_canonical
+        ]
+        rep = ev.model_copy(
+            update={
+                "description": event_labels[cid],
+                "occurred_at": event_rep_date.get(cid, ev.occurred_at),
+            }
+        )
+        upsert_event(driver, resolve_event_for_write(rep, cid, participants, case_id))
+
+    # --- Contradictions ---
+    # Each event becomes an `occurred_on` claim on its cluster, so a disputed event date surfaces
+    # once at the event level (via the same detector) instead of once per attendee.
     synthetic_claims = event_date_claims(all_events, event_local_to_canonical)
 
     detect_input = all_claims + synthetic_claims
@@ -360,8 +378,3 @@ def _wipe_postgres_derived_state(case_id: str) -> None:
         )
         cur.execute("DELETE FROM claims WHERE case_id = %s", (case_id,))
         cur.execute("DELETE FROM contradictions WHERE case_id = %s", (case_id,))
-
-
-def _event_canonical_id(event: Event) -> str:
-    key = f"{event.description.strip().lower()}|{event.occurred_at}"
-    return "evt_" + hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
