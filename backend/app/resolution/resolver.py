@@ -49,6 +49,17 @@ class ResolvedCluster:
     representative_entity: Entity
 
 
+def _match_key(entity: Entity, entity_type: EntityType) -> str:
+    """The string used for fuzzy matching during resolution.
+
+    Prefer the model's `canonical_name` over the raw surface form: the LLM resolves aliases
+    we can't reach by string similarity alone (e.g. "Bob" / "Bob Smith" → "Robert Smith").
+    Falls back to the verbatim mention when the model gave no canonical_name.
+    """
+    base = entity.canonical_name or entity.mention_text
+    return normalize_name(base, entity_type)
+
+
 def normalize_name(name: str, entity_type: EntityType) -> str:
     """Deterministic key for fuzzy matching. Lower-case, strip titles/punctuation."""
     s = name.strip().lower()
@@ -115,7 +126,7 @@ def resolve_entities(
     for etype, members in by_type.items():
         # Map normalized key → list of entities that share it.
         # We do single-linkage clustering on the fuzzy-match graph within this type.
-        norm_keys: list[str] = [normalize_name(e.mention_text, etype) for e in members]
+        norm_keys: list[str] = [_match_key(e, etype) for e in members]
 
         parent = list(range(len(members)))
 

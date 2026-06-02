@@ -70,6 +70,11 @@ class AnthropicProvider:
             messages=messages,
             output_format=output_format,
         )
+        if response.stop_reason == "max_tokens":
+            raise LLMParseError(
+                f"response truncated at max_tokens={max_tokens}; raise "
+                "EXTRACTION_MAX_OUTPUT_TOKENS — the JSON did not fit in the output budget"
+            )
         parsed = response.parsed_output
         if parsed is None:
             raise LLMParseError(
