@@ -70,6 +70,9 @@ export function ContradictionsPanel({
                 <div className="mt-2 text-base font-semibold">
                   {c.subject_entity_name ?? c.subject_entity_id} &nbsp;·&nbsp; {c.predicate}
                 </div>
+                {c.explanation && (
+                  <div className="mt-2 text-sm text-[color:var(--text)]">{c.explanation}</div>
+                )}
                 <div className="mt-2 text-sm text-[color:var(--muted)]">
                   {c.claims.length} conflicting sources · rank {c.rank_score.toFixed(2)}
                 </div>
