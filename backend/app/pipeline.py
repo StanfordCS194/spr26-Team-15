@@ -250,9 +250,14 @@ def run_pipeline_for_case(
         )
         from app.llm import make_provider
 
-        adjudicator = LLMAdjudicator(
-            make_provider(settings), model=settings.contradiction_explanation_model
+        # contradiction_explanation_model is a Claude name; only force it on the Anthropic
+        # provider — on Groq, keep the provider's own model.
+        adj_model = (
+            settings.contradiction_explanation_model
+            if settings.llm_provider == "anthropic"
+            else None
         )
+        adjudicator = LLMAdjudicator(make_provider(settings), model=adj_model)
         semantic = detect_semantic_contradictions(
             detect_input,
             adjudicator,
