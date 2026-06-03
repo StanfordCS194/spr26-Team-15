@@ -196,12 +196,13 @@ def build_local_to_canonical(clusters: list[ResolvedCluster]) -> dict[str, str]:
 # events by description similarity while IGNORING the date, so a meeting dated March 12 in
 # three documents and March 15 in a fourth resolves to ONE event whose date is in dispute.
 
-# Single-linkage cutoff for event descriptions. Tuned to sit above the similarity of
-# boilerplate-heavy-but-distinct events (e.g. two depositions that share "Deposition of … taken
-# in case CV-…" but name different people) and below the similarity of genuine re-tellings of
-# the same event. The same-meeting cluster is held together by several strong links (0.86–1.0),
-# so it stays intact even if a terse paraphrase drops out.
-EVENT_DESC_THRESHOLD = 82.0
+# Single-linkage cutoff for event descriptions. Set high enough to resist *chaining* — the
+# single-linkage failure mode where A~B and B~C transitively merge dissimilar A and C through a
+# weak bridge (e.g. a capital-infusion event and a finance-meeting event getting pulled into one
+# cluster). Genuine re-tellings of the same event score 0.86–1.0 against each other, so the real
+# clusters (the disputed meeting, the wire transfer) survive while distinct-but-related events and
+# boilerplate-heavy depositions stay separate. Don't lower without re-checking event over-merge.
+EVENT_DESC_THRESHOLD = 85.0
 
 _ALPHA_TOKENS = re.compile(r"[a-z]+")
 
