@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 
-import { listContradictions, type ContradictionDetail } from "@/lib/api";
+import {
+  getGraph,
+  listContradictions,
+  listDocuments,
+  type ContradictionDetail,
+} from "@/lib/api";
 
 interface Props {
   caseId: string;
@@ -16,6 +21,8 @@ export function ContradictionsPanel({
   onClaimSelect,
 }: Props) {
   const [contradictions, setContradictions] = useState<ContradictionDetail[]>([]);
+  const [docNames, setDocNames] = useState<Record<string, string>>({});
+  const [entityNames, setEntityNames] = useState<Record<string, string>>({});
   const [expanded, setExpanded] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,6 +31,19 @@ export function ContradictionsPanel({
     listContradictions(caseId)
       .then((c) => !cancelled && setContradictions(c))
       .catch((e) => !cancelled && setError(String(e)));
+    // Resolve human-readable labels for claim cards (filenames, speaker names).
+    listDocuments(caseId)
+      .then((docs) => {
+        if (!cancelled)
+          setDocNames(Object.fromEntries(docs.map((d) => [d.id, d.filename])));
+      })
+      .catch(() => {});
+    getGraph(caseId)
+      .then((g) => {
+        if (!cancelled)
+          setEntityNames(Object.fromEntries(g.entities.map((e) => [e.id, e.name])));
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -65,16 +85,16 @@ export function ContradictionsPanel({
               className="flex w-full items-start justify-between gap-4 px-5 py-4 text-left hover:bg-white/70"
               onClick={() => setExpanded((prev) => (prev === c.id ? null : c.id))}
             >
-              <div>
+              <div className="min-w-0">
                 <div className="panel-title">Predicate conflict</div>
-                <div className="mt-2 text-base font-semibold">
+                <div className="mt-2 text-base font-semibold break-words line-clamp-2">
                   {c.subject_entity_name ?? c.subject_entity_id} &nbsp;·&nbsp; {c.predicate}
                 </div>
                 {c.explanation && (
                   <div className="mt-2 text-sm text-[color:var(--text)]">{c.explanation}</div>
                 )}
                 <div className="mt-2 text-sm text-[color:var(--muted)]">
-                  {c.claims.length} conflicting sources · rank {c.rank_score.toFixed(2)}
+                  {c.claims.length} conflicting sources · rank {(c.rank_score ?? 0).toFixed(2)}
                 </div>
               </div>
               <span className="rounded-full border border-[color:var(--line)] bg-white px-2 py-1 text-xs text-[color:var(--muted)]">
@@ -93,7 +113,10 @@ export function ContradictionsPanel({
                     className="rounded-2xl border border-[color:var(--line)] bg-white p-4 text-left shadow-sm transition hover:border-[color:var(--accent)] hover:shadow-md"
                   >
                     <div className="panel-title">
-                      {claim.speaker_entity_id ?? "—"} · {claim.source_doc_id.slice(0, 8)}…
+                      {(claim.speaker_entity_id &&
+                        (entityNames[claim.speaker_entity_id] ?? claim.speaker_entity_id)) ||
+                        "—"}{" "}
+                      · {docNames[claim.source_doc_id] ?? `${claim.source_doc_id.slice(0, 8)}…`}
                     </div>
                     <div className="mt-2 font-mono text-sm text-[color:var(--text)]">{claim.value}</div>
                     <div className="mt-3 text-sm leading-6 text-[color:var(--muted)]">

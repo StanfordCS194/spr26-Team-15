@@ -27,32 +27,36 @@ export default function CaseWorkspacePage() {
   } | null>(null);
   const [preferredDocId, setPreferredDocId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setError(null);
+    setLoading(true);
 
     (async () => {
       try {
-        const data = await getCase(caseId);
-        if (!cancelled) setSummary(data);
-        return;
-      } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        if (!message.includes("404")) {
-          if (!cancelled) setError(message);
+        try {
+          const data = await getCase(caseId);
+          if (!cancelled) setSummary(data);
           return;
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          if (!message.includes("404")) {
+            if (!cancelled) setError(message);
+            return;
+          }
         }
-      }
 
-      try {
-        const created = await createCase(caseId);
-        if (!cancelled) setSummary(created);
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : String(e));
+        try {
+          const created = await createCase(caseId);
+          if (!cancelled) setSummary(created);
+        } catch (e) {
+          if (!cancelled) setError(e instanceof Error ? e.message : String(e));
         }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
 
@@ -108,6 +112,17 @@ export default function CaseWorkspacePage() {
     setPreferredDocId(null);
     setHighlight(null);
   }, []);
+
+  if (loading && !summary && !error) {
+    return (
+      <main className="workspace-shell">
+        <div className="workspace-card flex min-h-[calc(100vh-36px)] flex-col items-center justify-center rounded-[28px]">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[color:var(--line-strong)] border-t-[color:var(--accent)]" />
+          <p className="mt-4 text-sm text-[color:var(--muted)]">Loading case…</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="workspace-shell">

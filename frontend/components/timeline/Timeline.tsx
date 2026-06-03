@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Timeline as VisTimeline } from "vis-timeline/standalone";
 import { DataSet } from "vis-data";
 
@@ -50,15 +50,17 @@ export function Timeline({
     };
   }, [caseId, refreshToken]);
 
-  const filteredEvents = events.filter((event) => {
-    if (!search.trim()) return true;
+  // Memoized so unrelated re-renders (e.g. selecting an event) don't rebuild the vis-timeline.
+  const filteredEvents = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return (
-      event.description.toLowerCase().includes(q) ||
-      event.occurred_at.toLowerCase().includes(q) ||
-      event.participants.some((participant) => participant.name.toLowerCase().includes(q))
+    if (!q) return events;
+    return events.filter(
+      (event) =>
+        event.description.toLowerCase().includes(q) ||
+        event.occurred_at.toLowerCase().includes(q) ||
+        event.participants.some((participant) => participant.name.toLowerCase().includes(q)),
     );
-  });
+  }, [events, search]);
 
   useEffect(() => {
     if (!containerRef.current || filteredEvents.length === 0) return;

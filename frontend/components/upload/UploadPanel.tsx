@@ -41,7 +41,9 @@ export function UploadPanel({ caseId, onUploaded }: Props) {
       onUploaded(lastUploadedDocId);
     } catch (e) {
       setPhase("Upload failed");
-      setStatus(`Error: ${String(e)}`);
+      setProgress(0);
+      const msg = e instanceof Error ? e.message : String(e);
+      setStatus(msg.replace(/^Error:\s*/, "").slice(0, 200));
     } finally {
       setPending(false);
     }
@@ -82,13 +84,15 @@ export function UploadPanel({ caseId, onUploaded }: Props) {
               <div className="text-sm text-[color:var(--muted)]">{status}</div>
             </div>
             <div className="rounded-full border border-[color:var(--line)] bg-[color:var(--bg-soft)] px-3 py-1 text-xs text-[color:var(--muted)]">
-              {progress}% complete
+              {pending ? "Working…" : `${progress}% complete`}
             </div>
           </div>
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#eadfce]">
             <div
-              className="h-full rounded-full bg-[linear-gradient(90deg,#a54e2d,#365345)] transition-all duration-300"
-              style={{ width: `${Math.max(progress, pending ? 8 : 0)}%` }}
+              className={`h-full rounded-full bg-[linear-gradient(90deg,#a54e2d,#365345)] transition-all duration-300 ${
+                pending ? "animate-pulse" : ""
+              }`}
+              style={{ width: `${pending ? Math.max(progress, 40) : progress}%` }}
             />
           </div>
           {details.length > 0 && (
