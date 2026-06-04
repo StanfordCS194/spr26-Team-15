@@ -1,5 +1,5 @@
 {
-  "notes": "Hand-labeled ground truth for the seed corpus. Used by backend/tests/eval/. Every entity carries a canonical name so the eval harness can compare against resolver output regardless of which surface form the model extracted.",
+  "notes": "Hand-labeled ground truth for the seed corpus. Used by backend/tests/eval/. Every entity carries a canonical name so the eval harness can compare against resolver output regardless of which surface form the model extracted. The three contradictions match manifest.json: (1) the meeting date is disputed and is modeled on the meeting event via predicate 'occurred_on'; (2) the wire amount is disputed; (3) Smith's attendance (present vs absent) is disputed, modeled via predicate 'attended_meeting'.",
   "entities": [
     {"canonical_name": "Robert K. Smith", "type": "Person", "surface_forms": ["Robert K. Smith", "Bob Smith", "R.K. Smith", "Mr. Smith"]},
     {"canonical_name": "Jeffrey K. Skilling", "type": "Person", "surface_forms": ["Jeffrey K. Skilling", "Jeffrey Skilling", "Jeff Skilling", "Mr. Skilling", "Jeff"]},
@@ -10,7 +10,11 @@
     {"canonical_name": "2001-03-12", "type": "Date", "surface_forms": ["March 12, 2001", "Mon, 12 Mar 2001"]},
     {"canonical_name": "2001-03-15", "type": "Date", "surface_forms": ["March 15, 2001"]},
     {"canonical_name": "2500000", "type": "Money", "surface_forms": ["$2.5M", "$2.5 million", "2.5 million"]},
-    {"canonical_name": "5000000", "type": "Money", "surface_forms": ["$5 million", "approximately $5 million"]}
+    {"canonical_name": "5000000", "type": "Money", "surface_forms": ["$5 million", "approximately $5 million"]},
+    {"canonical_name": "2002-03-14", "type": "Date", "surface_forms": ["March 14, 2002", "Taken March 14, 2002"]},
+    {"canonical_name": "2002-04-02", "type": "Date", "surface_forms": ["April 2, 2002", "Taken April 2, 2002"]},
+    {"canonical_name": "2002-04-09", "type": "Date", "surface_forms": ["April 9, 2002", "Taken April 9, 2002"]},
+    {"canonical_name": "CV-2002-0043", "type": "Document", "surface_forms": ["Case No. CV-2002-0043", "CV-2002-0043"]}
   ],
   "relations": [
     {"subject": "Jeffrey K. Skilling", "type": "communicated_with", "object": "Robert K. Smith"},
@@ -20,16 +24,25 @@
   ],
   "contradictions": [
     {
-      "subject_canonical": "Robert K. Smith",
-      "predicate": "attended_meeting_on",
-      "conflicting_values": ["2001-03-12", "2001-03-15", "absent"],
-      "min_sources": 2
+      "subject_canonical": "Raptor II finance committee meeting",
+      "predicate": "occurred_on",
+      "conflicting_values": ["2001-03-12", "2001-03-15"],
+      "min_sources": 2,
+      "description": "Meeting date disputed: Mar 12 (Smith, Skilling, memo) vs Mar 15 (Fastow)."
     },
     {
       "subject_canonical": "Raptor II wire transfer",
       "predicate": "received_payment_of",
       "conflicting_values": ["2500000", "5000000"],
-      "min_sources": 2
+      "min_sources": 2,
+      "description": "Wire amount disputed: $2.5M (most docs) vs ~$5M (Fastow)."
+    },
+    {
+      "subject_canonical": "Robert K. Smith",
+      "predicate": "attended_meeting",
+      "conflicting_values": ["present", "absent"],
+      "min_sources": 2,
+      "description": "Smith's attendance disputed: present (Smith, Skilling, memo) vs absent (Fastow)."
     }
   ]
 }

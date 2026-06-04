@@ -8,9 +8,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
-from app.contradictions.detector import detect_contradictions
+from app.contradictions.detector import (
+    detect_contradictions,
+    suppress_event_subsumed_contradictions,
+    template_explanation,
+)
 from app.db import get_conn
 from app.graph.client import get_driver
 from app.graph.writer import (
@@ -156,16 +160,16 @@ RELATION_SPECS: tuple[_RelationSpec, ...] = (
 
 CLAIM_SPECS: tuple[_ClaimSpec, ...] = (
     _ClaimSpec("event_meeting", "occurred_on", "2001-03-12", "date", "person_smith", "smith_deposition_excerpt.txt", "A. To the best of my recollection, it was March 12, 2001."),
-    _ClaimSpec("person_smith", "attended_meeting_on", "2001-03-12", "text", "person_smith", "smith_deposition_excerpt.txt", "A. Jeffrey Skilling attended, along with Andrew Fastow and myself."),
+    _ClaimSpec("person_smith", "attended_meeting", "present", "text", "person_smith", "smith_deposition_excerpt.txt", "A. Jeffrey Skilling attended, along with Andrew Fastow and myself."),
     _ClaimSpec("event_transfer", "received_payment_of", "2500000", "money", "person_smith", "smith_deposition_excerpt.txt", "A. Yes. A $2.5 million transfer to Raptor II."),
     _ClaimSpec("event_transfer", "authorized_by", "person_skilling", "entity_ref", "person_smith", "smith_deposition_excerpt.txt", "I signed off on it personally at Jeff's request."),
     _ClaimSpec("event_transfer", "authorized_on", "2001-03-09", "date", "person_smith", "smith_deposition_excerpt.txt", "The approval came via email on March 9, 2001."),
     _ClaimSpec("event_meeting", "occurred_on", "2001-03-15", "date", "person_fastow", "fastow_deposition_excerpt.txt", "A. March 15, 2001."),
-    _ClaimSpec("person_smith", "attended_meeting_on", "absent", "text", "person_fastow", "fastow_deposition_excerpt.txt", "Bob Smith was not present — he was out of the office that week."),
+    _ClaimSpec("person_smith", "attended_meeting", "absent", "text", "person_fastow", "fastow_deposition_excerpt.txt", "Bob Smith was not present — he was out of the office that week."),
     _ClaimSpec("event_transfer", "received_payment_of", "5000000", "money", "person_fastow", "fastow_deposition_excerpt.txt", "A. I recall it being approximately $5 million, not the smaller figure some documents suggest."),
     _ClaimSpec("event_transfer", "authorized_by", "person_skilling", "entity_ref", "person_fastow", "fastow_deposition_excerpt.txt", "The transfer was approved by Mr. Skilling directly, not by me."),
     _ClaimSpec("event_meeting", "occurred_on", "2001-03-12", "date", "person_skilling", "skilling_deposition_excerpt.txt", "A. I believe it was March 12, 2001. My calendar confirms that."),
-    _ClaimSpec("person_smith", "attended_meeting_on", "2001-03-12", "text", "person_skilling", "skilling_deposition_excerpt.txt", "A. Robert Smith, Andrew Fastow, and myself."),
+    _ClaimSpec("person_smith", "attended_meeting", "present", "text", "person_skilling", "skilling_deposition_excerpt.txt", "A. Robert Smith, Andrew Fastow, and myself."),
     _ClaimSpec("event_transfer", "received_payment_of", "2500000", "money", "person_skilling", "skilling_deposition_excerpt.txt", "A. Yes, I approved a $2.5 million transfer."),
     _ClaimSpec("event_transfer", "authorized_by", "person_skilling", "entity_ref", "person_skilling", "skilling_deposition_excerpt.txt", "A. Yes, I approved a $2.5 million transfer."),
     _ClaimSpec("event_transfer", "received_payment_of", "2500000", "money", "person_smith", "email_001.txt", "Confirming the $2.5M wire to Raptor II was sent Friday per your approval."),
@@ -174,7 +178,7 @@ CLAIM_SPECS: tuple[_ClaimSpec, ...] = (
     _ClaimSpec("event_meeting", "occurred_on", "2001-03-12", "date", "person_skilling", "email_002.txt", "Let's review at the finance committee on Monday."),
     _ClaimSpec("event_transfer", "received_payment_of", "2500000", "money", "person_smith", "internal_memo_raptor2.txt", "Raptor II received a $2.5 million capital infusion on March 9, 2001"),
     _ClaimSpec("event_transfer", "authorized_by", "person_skilling", "entity_ref", "person_smith", "internal_memo_raptor2.txt", "per Mr. Skilling's written authorization to Mr. Smith dated the same day."),
-    _ClaimSpec("person_smith", "attended_meeting_on", "2001-03-12", "text", "person_smith", "internal_memo_raptor2.txt", "Attendees: Jeffrey Skilling, Andrew Fastow, Robert K. Smith"),
+    _ClaimSpec("person_smith", "attended_meeting", "present", "text", "person_smith", "internal_memo_raptor2.txt", "Attendees: Jeffrey Skilling, Andrew Fastow, Robert K. Smith"),
 )
 
 EVENT_SPECS: tuple[_EventSpec, ...] = (
@@ -291,7 +295,25 @@ def populate_demo_case(case_id: str) -> DemoPipelineStats | None:
             )
         )
 
-    contradictions = detect_contradictions(claims_written)
+    # The seed's CLAIM_SPECS already carry the disputed meeting date as `occurred_on` claims on
+    # the meeting event, so detection + suppression matches the live pipeline. Subjects (events
+    # and people) are named from the entity specs for the UI labels/explanations.
+    label_by_id = {s.canonical_id: s.canonical_name for s in ENTITY_SPECS}
+    claims_by_id = {c.id: c for c in claims_written}
+    contradictions = suppress_event_subsumed_contradictions(
+        detect_contradictions(claims_written), claims_by_id
+    )
+    contradictions = [
+        replace(
+            c,
+            subject_label=label_by_id.get(c.subject_entity_id, ""),
+            explanation=template_explanation(
+                replace(c, subject_label=label_by_id.get(c.subject_entity_id, "")),
+                claims_by_id,
+            ),
+        )
+        for c in contradictions
+    ]
     _persist_claims_and_contradictions(case_id, claims_written, contradictions)
 
     return DemoPipelineStats(
@@ -376,17 +398,18 @@ def _persist_claims_and_contradictions(case_id: str, claims: list[Claim], contra
             )
         for contra in contradictions:
             cur.execute(
-                "INSERT INTO contradictions (id, case_id, subject_entity_id, predicate, "
-                "conflicting_claim_ids, explanation, rank_score) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s) "
+                "INSERT INTO contradictions (id, case_id, subject_entity_id, subject_label, "
+                "predicate, conflicting_claim_ids, explanation, rank_score) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) "
                 "ON CONFLICT (id) DO NOTHING",
                 (
                     contra.id,
                     case_id,
                     contra.subject_entity_id,
+                    contra.subject_label,
                     contra.predicate,
                     json.dumps(contra.conflicting_claim_ids),
-                    "",
+                    contra.explanation,
                     contra.rank_score,
                 ),
             )

@@ -39,6 +39,23 @@ class Settings(BaseSettings):
     resolution_model: str = "claude-haiku-4-5-20251001"
     contradiction_explanation_model: str = "claude-haiku-4-5-20251001"
 
+    # Semantic contradiction pass (additive LLM second pass; see contradictions/semantic.py).
+    # OFF by default: it makes extra LLM calls and is not needed for the deterministic baseline.
+    # Turn on in a demo .env to showcase cross-predicate / cross-value-type detection.
+    semantic_contradictions_enabled: bool = Field(
+        default=False, alias="SEMANTIC_CONTRADICTIONS_ENABLED"
+    )
+    semantic_contradictions_max_pairs: int = Field(
+        default=50, alias="SEMANTIC_CONTRADICTIONS_MAX_PAIRS"
+    )
+
+    # Max output tokens for a single extraction call. Must be large enough to hold the full
+    # JSON (entities + relations + claims + events with provenance) for one chunk — too low
+    # truncates the response mid-string and the repair loop can't recover.
+    extraction_max_output_tokens: int = Field(
+        default=8000, alias="EXTRACTION_MAX_OUTPUT_TOKENS"
+    )
+
     # Model selection — Groq (override via GROQ_EXTRACTION_MODEL)
     groq_extraction_model: str = Field(
         default="llama-3.3-70b-versatile", alias="GROQ_EXTRACTION_MODEL"

@@ -37,7 +37,9 @@ from app.models.extraction import ExtractionResult
 
 logger = logging.getLogger(__name__)
 
-MAX_OUTPUT_TOKENS = 2000
+# Default kept for tests/back-compat; the runtime value comes from
+# Settings.extraction_max_output_tokens (see ExtractionClient.__init__).
+MAX_OUTPUT_TOKENS = 8000
 
 # Alias kept so pipeline.py and tests can import ExtractionUsage from here unchanged.
 ExtractionUsage = LLMUsage
@@ -76,6 +78,9 @@ class ExtractionClient:
             if model:
                 self._provider.model = model
         self._model = self._provider.model
+        self._max_output_tokens = getattr(
+            s, "extraction_max_output_tokens", MAX_OUTPUT_TOKENS
+        )
 
     def extract(
         self,
@@ -149,7 +154,7 @@ class ExtractionClient:
         def _once() -> tuple[ExtractionResult, ExtractionUsage]:
             try:
                 parsed, usage = self._provider.parse(
-                    messages, SYSTEM_PROMPT, ExtractionResult, MAX_OUTPUT_TOKENS
+                    messages, SYSTEM_PROMPT, ExtractionResult, self._max_output_tokens
                 )
             except LLMParseError as e:
                 raise ExtractionValidationError(str(e)) from e
