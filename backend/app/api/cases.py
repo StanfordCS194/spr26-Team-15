@@ -21,6 +21,47 @@ class CaseSummary(BaseModel):
     contradiction_count: int
 
 
+@router.get("", response_model=list[CaseSummary])
+def list_cases() -> list[CaseSummary]:
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT c.id, c.name, "
+            "COUNT(DISTINCT d.id) AS doc_count, "
+            "COUNT(DISTINCT co.id) AS contra_count "
+            "FROM cases c "
+            "LEFT JOIN documents d ON d.case_id = c.id "
+            "LEFT JOIN contradictions co ON co.case_id = c.id "
+            "GROUP BY c.id, c.name "
+            "ORDER BY c.created_at DESC",
+        )
+        rows = cur.fetchall()
+
+    entity_counts: dict[str, int] = {}
+    try:
+        from app.graph.client import get_driver
+
+        with get_driver().session() as session:
+            result = session.run(
+                "MATCH (e:Entity) RETURN e.case_id AS case_id, count(e) AS c"
+            )
+            for row in result:
+                if row["case_id"]:
+                    entity_counts[row["case_id"]] = row["c"]
+    except Exception:
+        pass
+
+    return [
+        CaseSummary(
+            id=r["id"],
+            name=r["name"],
+            document_count=r["doc_count"],
+            entity_count=entity_counts.get(r["id"], 0),
+            contradiction_count=r["contra_count"],
+        )
+        for r in rows
+    ]
+
+
 @router.post("", response_model=CaseSummary)
 def create_case(body: CreateCaseRequest) -> CaseSummary:
     with get_conn() as conn, conn.cursor() as cur:

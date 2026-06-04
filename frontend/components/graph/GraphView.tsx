@@ -198,14 +198,14 @@ export function GraphView({ caseId, selectedId, refreshToken = 0, onSelect }: Pr
         />
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[270px_1fr]">
-        <aside className="border-b border-[color:var(--line)] bg-[#f7efe4] lg:border-b-0 lg:border-r">
-          <div className="border-b border-[color:var(--line)] px-4 py-3">
+        <aside className="flex flex-col overflow-hidden border-b border-[color:var(--line)] bg-[#f7efe4] lg:border-b-0 lg:border-r">
+          <div className="shrink-0 border-b border-[color:var(--line)] px-4 py-3">
             <div className="panel-title">Entity Navigator</div>
             <div className="mt-2 text-sm text-[color:var(--muted)]">
               Browse extracted entities directly and use the graph for relationship context.
             </div>
           </div>
-          <div className="max-h-[280px] overflow-y-auto lg:max-h-none lg:h-full">
+          <div className="flex-1 min-h-0 overflow-y-auto">
             {filteredEntities.length === 0 ? (
               <div className="p-4 text-sm text-[color:var(--muted)]">
                 No entities match the current filter.

@@ -173,8 +173,8 @@ export default function CaseWorkspacePage() {
 
         <div className="min-h-0 flex-1 p-4 sm:p-5">
           {tab === "workspace" ? (
-            <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-rows-[minmax(320px,0.88fr)_minmax(360px,1fr)]">
-              <section className="workspace-card-strong min-h-[320px] overflow-hidden rounded-[24px] xl:col-span-2">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              <section className="workspace-card-strong h-[700px] overflow-hidden rounded-[24px] xl:col-span-2">
                 <Timeline
                   caseId={caseId}
                   refreshToken={refreshKey}
@@ -182,7 +182,7 @@ export default function CaseWorkspacePage() {
                   onParticipantSelect={handleParticipantSelect}
                 />
               </section>
-              <section className="workspace-card-strong min-h-[320px] overflow-hidden rounded-[24px]">
+              <section className="workspace-card-strong h-[600px] overflow-hidden rounded-[24px]">
                 <DocPane
                   caseId={caseId}
                   highlight={highlight}
@@ -191,7 +191,7 @@ export default function CaseWorkspacePage() {
                   onManualSelect={handleManualDocSelect}
                 />
               </section>
-              <section className="workspace-card-strong min-h-[320px] overflow-hidden rounded-[24px]">
+              <section className="workspace-card-strong h-[800px] overflow-hidden rounded-[24px]">
                 <GraphView
                   caseId={caseId}
                   selectedId={selectedEntityId}
@@ -201,7 +201,7 @@ export default function CaseWorkspacePage() {
               </section>
             </div>
           ) : (
-            <section className="workspace-card-strong h-full overflow-hidden rounded-[24px]">
+            <section className="workspace-card-strong min-h-[600px] overflow-hidden rounded-[24px]">
               <ContradictionsPanel
                 caseId={caseId}
                 refreshToken={refreshKey}

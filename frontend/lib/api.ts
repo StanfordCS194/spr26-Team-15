@@ -16,6 +16,10 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export async function listCases(): Promise<CaseSummary[]> {
+  return fetchJson<CaseSummary[]>("/cases");
+}
+
 export async function createCase(
   caseId: string,
   name = `Case ${caseId}`,
@@ -67,6 +71,7 @@ export interface ContradictionDetail {
     claim_id: string;
     value: string;
     speaker_entity_id: string | null;
+    speaker_entity_name: string | null;
     source_doc_id: string;
     chunk_id: string;
     char_start: number;
