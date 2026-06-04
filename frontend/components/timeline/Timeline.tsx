@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Timeline as VisTimeline } from "vis-timeline/standalone";
 import { DataSet } from "vis-data";
 
@@ -30,10 +30,19 @@ export function Timeline({
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const timelineRef = useRef<VisTimeline | null>(null);
+  const itemsRef = useRef<DataSet<{ id: string; content: string; start: string }> | null>(null);
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [search, setSearch] = useState("");
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Keep the select handler reading current events without re-creating the widget.
+  const eventsRef = useRef<TimelineEvent[]>(events);
+  const onEventSelectRef = useRef(onEventSelect);
+  useEffect(() => {
+    eventsRef.current = events;
+    onEventSelectRef.current = onEventSelect;
+  }, [events, onEventSelect]);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,18 +59,20 @@ export function Timeline({
     };
   }, [caseId, refreshToken]);
 
-  const filteredEvents = events.filter((event) => {
-    if (!search.trim()) return true;
+  // Memoized so unrelated re-renders (e.g. selecting an event) don't rebuild the vis-timeline.
+  const filteredEvents = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return (
-      event.description.toLowerCase().includes(q) ||
-      event.occurred_at.toLowerCase().includes(q) ||
-      event.participants.some((participant) => participant.name.toLowerCase().includes(q))
+    if (!q) return events;
+    return events.filter(
+      (event) =>
+        event.description.toLowerCase().includes(q) ||
+        event.occurred_at.toLowerCase().includes(q) ||
+        event.participants.some((participant) => participant.name.toLowerCase().includes(q)),
     );
-  });
+  }, [events, search]);
 
   useEffect(() => {
-    if (!containerRef.current || filteredEvents.length === 0) return;
+    if (!containerRef.current) return;
 
     let cancelled = false;
     (async () => {
@@ -69,15 +80,22 @@ export function Timeline({
       const { Timeline } = await import("vis-timeline/standalone");
       if (cancelled || !containerRef.current) return;
 
-      const items = new DataSet(
-        filteredEvents.map((e) => ({
-          id: e.id,
-          content: e.description,
-          start: e.occurred_at,
-        })),
-      );
+      const data = filteredEvents.map((e) => ({
+        id: e.id,
+        content: e.description,
+        start: e.occurred_at,
+      }));
 
-      timelineRef.current?.destroy();
+      // Update the existing widget's dataset in place — no destroy/recreate, so typing in the
+      // search box doesn't flicker or drop selection.
+      if (timelineRef.current && itemsRef.current) {
+        itemsRef.current.clear();
+        itemsRef.current.add(data);
+        return;
+      }
+
+      const items = new DataSet(data);
+      itemsRef.current = items;
       timelineRef.current = new Timeline(containerRef.current, items, {
         stack: true,
         zoomable: true,
@@ -87,19 +105,26 @@ export function Timeline({
       });
       timelineRef.current.on("select", (evt: { items: string[] }) => {
         if (evt.items.length === 0) return;
-        const event = events.find((candidate) => candidate.id === evt.items[0]);
+        const event = eventsRef.current.find((candidate) => candidate.id === evt.items[0]);
         if (!event) return;
         setSelectedEventId(event.id);
-        onEventSelect(event);
+        onEventSelectRef.current(event);
       });
     })();
 
     return () => {
       cancelled = true;
+    };
+  }, [filteredEvents]);
+
+  // Destroy the widget only on unmount.
+  useEffect(() => {
+    return () => {
       timelineRef.current?.destroy();
       timelineRef.current = null;
+      itemsRef.current = null;
     };
-  }, [events, filteredEvents, onEventSelect]);
+  }, []);
 
   if (error) return <div className="p-5 text-sm text-red-600">Timeline error: {error}</div>;
   if (events.length === 0)

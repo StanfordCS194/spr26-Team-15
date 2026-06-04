@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { listContradictions, type ContradictionDetail } from "@/lib/api";
+import {
+  getGraph,
+  listContradictions,
+  listDocuments,
+  type ContradictionDetail,
+} from "@/lib/api";
 
 type SortKey = "rank" | "entity" | "sources";
 
@@ -18,6 +23,8 @@ export function ContradictionsPanel({
   onClaimSelect,
 }: Props) {
   const [contradictions, setContradictions] = useState<ContradictionDetail[]>([]);
+  const [docNames, setDocNames] = useState<Record<string, string>>({});
+  const [entityNames, setEntityNames] = useState<Record<string, string>>({});
   const [expanded, setExpanded] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -28,6 +35,19 @@ export function ContradictionsPanel({
     listContradictions(caseId)
       .then((c) => !cancelled && setContradictions(c))
       .catch((e) => !cancelled && setError(String(e)));
+    // Resolve human-readable labels for claim cards (filenames, speaker names).
+    listDocuments(caseId)
+      .then((docs) => {
+        if (!cancelled)
+          setDocNames(Object.fromEntries(docs.map((d) => [d.id, d.filename])));
+      })
+      .catch(() => {});
+    getGraph(caseId)
+      .then((g) => {
+        if (!cancelled)
+          setEntityNames(Object.fromEntries(g.entities.map((e) => [e.id, e.name])));
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };

@@ -23,7 +23,7 @@ from dataclasses import dataclass
 
 from rapidfuzz import fuzz
 
-from app.models.extraction import Claim
+from app.models.extraction import Claim, Event
 
 _PUNCT = re.compile(r"[^\w\s]")
 
@@ -35,10 +35,21 @@ class ContradictionRecord:
     predicate: str
     conflicting_claim_ids: list[str]
     rank_score: float
+    # Human-readable subject when it isn't a graph entity (e.g. a resolved event/meeting).
+    # Empty for entity subjects, which the UI names from the graph instead.
+    subject_label: str = ""
+    # Short, deterministic description of the conflict, shown in the UI. Filled by the pipeline.
+    explanation: str = ""
 
 
 # Values closer than this are treated as "same" for free-text claims.
 TEXT_EQUIV_THRESHOLD = 90.0
+
+# Predicates that assert "person attended a meeting on <date>". A disagreement among these is
+# really a disagreement about the meeting's date, which we surface once at the event level
+# (predicate "occurred_on"); the per-attendee versions are redundant and get suppressed.
+_MEETING_DATE_PREDICATES = frozenset({"attended_meeting_on"})
+_EVENT_DATE_PREDICATE = "occurred_on"
 
 
 def _values_conflict(a: Claim, b: Claim) -> bool:
@@ -69,6 +80,35 @@ def _values_conflict(a: Claim, b: Claim) -> bool:
         fuzz.partial_ratio(va_n, vb_n),
     )
     return similarity < TEXT_EQUIV_THRESHOLD
+
+
+def event_date_claims(
+    events: list[Event], event_local_to_canonical: dict[str, str]
+) -> list[Claim]:
+    """Turn each event into an `occurred_on` claim whose subject is its resolved event cluster.
+
+    Feeding these through the normal detector means an event that's dated inconsistently across
+    documents surfaces as a single contradiction on the event — with full provenance, since each
+    claim keeps the originating event's source span.
+    """
+    out: list[Claim] = []
+    for ev in events:
+        if not ev.occurred_at:
+            continue
+        canonical = event_local_to_canonical.get(ev.id, ev.id)
+        out.append(
+            Claim(
+                id=f"{ev.id}::occurred_on",
+                subject_entity_id=canonical,
+                predicate=_EVENT_DATE_PREDICATE,
+                value=ev.occurred_at,
+                value_type="date",
+                speaker_entity_id=None,
+                provenance=ev.provenance,
+                confidence=ev.confidence,
+            )
+        )
+    return out
 
 
 def _find(parent: list[int], x: int) -> int:
@@ -161,3 +201,58 @@ def detect_contradictions(
     # Sort by rank (descending) so the UI gets the most important first.
     out.sort(key=lambda r: r.rank_score, reverse=True)
     return out
+
+
+def _value_set(record: ContradictionRecord, claims_by_id: dict[str, Claim]) -> set[str]:
+    return {
+        claims_by_id[cid].value.strip().lower()
+        for cid in record.conflicting_claim_ids
+        if cid in claims_by_id
+    }
+
+
+def suppress_event_subsumed_contradictions(
+    records: list[ContradictionRecord], claims_by_id: dict[str, Claim]
+) -> list[ContradictionRecord]:
+    """Drop per-attendee meeting-date conflicts that an event-level date conflict already covers.
+
+    When the same meeting is dated inconsistently we emit ONE contradiction on the event
+    (predicate "occurred_on"). Each attendee placed at that meeting also produces a redundant
+    "attended_meeting_on" date conflict over the same dates — those are noise once the
+    event-level conflict exists, so we remove the ones whose date set is covered.
+    """
+    event_date_sets = [
+        _value_set(r, claims_by_id)
+        for r in records
+        if r.predicate == _EVENT_DATE_PREDICATE
+    ]
+    if not event_date_sets:
+        return records
+
+    kept: list[ContradictionRecord] = []
+    for r in records:
+        if r.predicate in _MEETING_DATE_PREDICATES:
+            vals = _value_set(r, claims_by_id)
+            if vals and any(vals <= ds for ds in event_date_sets):
+                continue  # subsumed by an event-level date contradiction
+        kept.append(r)
+    return kept
+
+
+def template_explanation(
+    record: ContradictionRecord, claims_by_id: dict[str, Claim]
+) -> str:
+    """A short, deterministic, offline explanation of a contradiction for display.
+
+    Example: "3 sources disagree on 'attended_meeting_on': '2001-03-12' vs '2001-03-15'."
+    """
+    claims = [claims_by_id[cid] for cid in record.conflicting_claim_ids if cid in claims_by_id]
+    distinct_values = sorted({c.value.strip() for c in claims if c.value.strip()})
+    n_sources = len({c.provenance.chunk_id for c in claims}) or len(claims)
+    subject = record.subject_label or "this subject"
+    if len(distinct_values) >= 2:
+        rendered = " vs ".join(f"{v!r}" for v in distinct_values)
+        return (
+            f"{n_sources} sources disagree on '{record.predicate}' for {subject}: {rendered}."
+        )
+    return f"Conflicting '{record.predicate}' claims for {subject} across {n_sources} sources."
