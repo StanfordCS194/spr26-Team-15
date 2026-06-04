@@ -12,6 +12,7 @@ class ClaimExcerpt(BaseModel):
     claim_id: str
     value: str
     speaker_entity_id: str | None
+    speaker_entity_name: str | None
     source_doc_id: str
     chunk_id: str
     char_start: int
@@ -57,6 +58,9 @@ def list_contradictions(case_id: str) -> list[ContradictionDetail]:
                     claim_id=r["id"],
                     value=r["value"],
                     speaker_entity_id=r["speaker_entity_id"],
+                    speaker_entity_name=subject_names.get(r["speaker_entity_id"])
+                    if r["speaker_entity_id"]
+                    else None,
                     source_doc_id=r["source_doc_id"],
                     chunk_id=r["chunk_id"],
                     char_start=r["char_start"],

@@ -220,8 +220,8 @@ export function Timeline({
             </ul>
           )}
         </div>
-        <div className="grid min-h-0 grid-rows-[minmax(220px,1fr)_auto]">
-          <div ref={containerRef} className="min-h-[260px] overflow-hidden px-3 py-2 sm:px-4" />
+        <div className="flex flex-col">
+          <div ref={containerRef} className="h-[420px] overflow-hidden px-3 py-2 sm:px-4" />
           <div className="border-t border-[color:var(--line)] bg-white/85 px-4 py-4">
             {selectedEventId ? (
               (() => {
