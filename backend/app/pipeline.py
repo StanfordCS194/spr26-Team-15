@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, replace
 
-from app.contradictions.detector import ContradictionRecord, detect_contradictions
+from app.config import get_settings
+from app.contradictions.detector import (
+    ContradictionRecord,
+    detect_contradictions,
+    event_date_claims,
+    suppress_event_subsumed_contradictions,
+    template_explanation,
+)
 from app.db import get_conn
 from app.extraction.client import ExtractionClient, ExtractionValidationError
 from app.graph.client import get_driver
@@ -22,7 +29,11 @@ from app.graph.writer import (
     wipe_case,
 )
 from app.models.extraction import Claim, Entity, Event, ExtractionResult, Relation
-from app.resolution.resolver import build_local_to_canonical, resolve_entities
+from app.resolution.resolver import (
+    build_local_to_canonical,
+    resolve_entities,
+    resolve_events,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -180,20 +191,104 @@ def run_pipeline_for_case(
             continue  # dangling refs were flagged upstream; skip defensively
         upsert_relation(driver, resolve_relation_for_write(r, subj, obj, case_id))
 
+    # Resolve events once (ignoring date) — reused for timeline dedup AND event-date
+    # contradiction detection below. The same real event told several ways collapses to one
+    # cluster; its date is whatever's in dispute.
+    event_clusters = resolve_events([(ev.id, ev.description) for ev in all_events])
+    event_local_to_canonical = {
+        member: c.canonical_id for c in event_clusters for member in c.member_ids
+    }
+    event_labels = {c.canonical_id: c.canonical_description for c in event_clusters}
+    events_by_id = {ev.id: ev for ev in all_events}
+    # Representative timeline date per cluster = most common member date (ties → earliest).
+    event_rep_date: dict[str, str] = {}
+    for cluster in event_clusters:
+        dates = [
+            events_by_id[m].occurred_at for m in cluster.member_ids if events_by_id[m].occurred_at
+        ]
+        if dates:
+            counts = Counter(dates)
+            top = max(counts.values())
+            event_rep_date[cluster.canonical_id] = min(d for d, n in counts.items() if n == top)
+
+    # Write one deduped timeline node per resolved event cluster (provenance accumulates across
+    # the cluster's members; participants are unioned by the idempotent upsert).
     for ev in all_events:
+        cid = event_local_to_canonical[ev.id]
         participants = [
             local_to_canonical[p] for p in ev.participant_ids if p in local_to_canonical
         ]
-        event_canonical_id = _event_canonical_id(ev)
-        upsert_event(
-            driver,
-            resolve_event_for_write(ev, event_canonical_id, participants, case_id),
+        rep = ev.model_copy(
+            update={
+                "description": event_labels[cid],
+                "occurred_at": event_rep_date.get(cid, ev.occurred_at),
+            }
         )
+        upsert_event(driver, resolve_event_for_write(rep, cid, participants, case_id))
 
     # --- Contradictions ---
-    contradictions = detect_contradictions(all_claims, local_to_canonical=local_to_canonical)
+    # Each event becomes an `occurred_on` claim on its cluster, so a disputed event date surfaces
+    # once at the event level (via the same detector) instead of once per attendee.
+    synthetic_claims = event_date_claims(all_events, event_local_to_canonical)
+
+    detect_input = all_claims + synthetic_claims
+    raw_contradictions = detect_contradictions(
+        detect_input, local_to_canonical=local_to_canonical
+    )
+
+    claims_by_id = {c.id: c for c in detect_input}
+    contradictions = suppress_event_subsumed_contradictions(raw_contradictions, claims_by_id)
+
+    # Optional additive semantic pass for cross-predicate / cross-value-type conflicts the
+    # deterministic detector can't see (gated off by default).
+    settings = get_settings()
+    if settings.semantic_contradictions_enabled:
+        from app.contradictions.semantic import (
+            LLMAdjudicator,
+            detect_semantic_contradictions,
+            merge_contradictions,
+        )
+        from app.llm import make_provider
+
+        # contradiction_explanation_model is a Claude name; only force it on the Anthropic
+        # provider — on Groq, keep the provider's own model.
+        adj_model = (
+            settings.contradiction_explanation_model
+            if settings.llm_provider == "anthropic"
+            else None
+        )
+        adjudicator = LLMAdjudicator(make_provider(settings), model=adj_model)
+        semantic = detect_semantic_contradictions(
+            detect_input,
+            adjudicator,
+            local_to_canonical=local_to_canonical,
+            max_pairs=settings.semantic_contradictions_max_pairs,
+        )
+        contradictions = merge_contradictions(contradictions, semantic)
+
+    # Attach a human-readable subject (for events) and a short explanation for the UI. Keep any
+    # explanation a pass already produced (e.g. the semantic adjudicator's); else use a template.
+    contradictions = [
+        replace(
+            c,
+            subject_label=event_labels.get(c.subject_entity_id, c.subject_label),
+            explanation=(
+                c.explanation
+                or template_explanation(
+                    replace(
+                        c,
+                        subject_label=event_labels.get(c.subject_entity_id, c.subject_label),
+                    ),
+                    claims_by_id,
+                )
+            ),
+        )
+        for c in contradictions
+    ]
     stats.contradictions_found = len(contradictions)
-    _persist_claims_and_contradictions(case_id, all_claims, local_to_canonical, contradictions)
+    _persist_claims_and_contradictions(
+        case_id, detect_input, local_to_canonical, contradictions
+    )
 
     return stats
 
@@ -262,17 +357,18 @@ def _persist_claims_and_contradictions(
             )
         for contra in contradictions:
             cur.execute(
-                "INSERT INTO contradictions (id, case_id, subject_entity_id, predicate, "
-                "conflicting_claim_ids, explanation, rank_score) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s) "
+                "INSERT INTO contradictions (id, case_id, subject_entity_id, subject_label, "
+                "predicate, conflicting_claim_ids, explanation, rank_score) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) "
                 "ON CONFLICT (id) DO NOTHING",
                 (
                     contra.id,
                     case_id,
                     contra.subject_entity_id,
+                    contra.subject_label,
                     contra.predicate,
                     json.dumps(contra.conflicting_claim_ids),
-                    "",  # LLM-generated explanation is a follow-up; leave empty for v1
+                    contra.explanation,
                     contra.rank_score,
                 ),
             )
@@ -287,8 +383,3 @@ def _wipe_postgres_derived_state(case_id: str) -> None:
         )
         cur.execute("DELETE FROM claims WHERE case_id = %s", (case_id,))
         cur.execute("DELETE FROM contradictions WHERE case_id = %s", (case_id,))
-
-
-def _event_canonical_id(event: Event) -> str:
-    key = f"{event.description.strip().lower()}|{event.occurred_at}"
-    return "evt_" + hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]

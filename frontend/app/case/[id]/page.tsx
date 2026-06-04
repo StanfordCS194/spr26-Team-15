@@ -7,7 +7,7 @@ import { createCase, getCase, parseProvenance } from "@/lib/api";
 import type { CaseSummary, GraphEntity } from "@/lib/types";
 import { ContradictionsPanel } from "@/components/contradictions/ContradictionsPanel";
 import { DocPane } from "@/components/document/DocPane";
-import { ExportReportButton } from "@/components/export/ExportReportButton";
+import { EntityProfileDrawer } from "@/components/entity/EntityProfileDrawer";
 import { GraphView } from "@/components/graph/GraphView";
 import { Timeline } from "@/components/timeline/Timeline";
 import { UploadPanel } from "@/components/upload/UploadPanel";
@@ -21,6 +21,7 @@ export default function CaseWorkspacePage() {
   const [summary, setSummary] = useState<CaseSummary | null>(null);
   const [tab, setTab] = useState<Tab>("workspace");
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  const [drawerEntityId, setDrawerEntityId] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<{
     docId: string;
     start: number;
@@ -28,32 +29,36 @@ export default function CaseWorkspacePage() {
   } | null>(null);
   const [preferredDocId, setPreferredDocId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setError(null);
+    setLoading(true);
 
     (async () => {
       try {
-        const data = await getCase(caseId);
-        if (!cancelled) setSummary(data);
-        return;
-      } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        if (!message.includes("404")) {
-          if (!cancelled) setError(message);
+        try {
+          const data = await getCase(caseId);
+          if (!cancelled) setSummary(data);
           return;
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          if (!message.includes("404")) {
+            if (!cancelled) setError(message);
+            return;
+          }
         }
-      }
 
-      try {
-        const created = await createCase(caseId);
-        if (!cancelled) setSummary(created);
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : String(e));
+        try {
+          const created = await createCase(caseId);
+          if (!cancelled) setSummary(created);
+        } catch (e) {
+          if (!cancelled) setError(e instanceof Error ? e.message : String(e));
         }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
 
@@ -64,6 +69,7 @@ export default function CaseWorkspacePage() {
 
   const handleEntitySelect = useCallback((id: string, entity: GraphEntity | null) => {
     setSelectedEntityId(id);
+    setDrawerEntityId(id);
     const rawProv = entity?.provenance?.[0];
     if (rawProv) {
       const parsed = parseProvenance(rawProv);
@@ -72,6 +78,16 @@ export default function CaseWorkspacePage() {
         setHighlight({ docId: parsed.docId, start: parsed.start, end: parsed.end });
       }
     }
+  }, []);
+
+  const handleParticipantSelect = useCallback((id: string) => {
+    setSelectedEntityId(id);
+    setDrawerEntityId(id);
+  }, []);
+
+  const handleDrawerEntityNavigate = useCallback((id: string) => {
+    setSelectedEntityId(id);
+    setDrawerEntityId(id);
   }, []);
 
   const handleClaimSelect = useCallback((docId: string, start: number, end: number) => {
@@ -109,6 +125,17 @@ export default function CaseWorkspacePage() {
     setPreferredDocId(null);
     setHighlight(null);
   }, []);
+
+  if (loading && !summary && !error) {
+    return (
+      <main className="workspace-shell">
+        <div className="workspace-card flex min-h-[calc(100vh-36px)] flex-col items-center justify-center rounded-[28px]">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[color:var(--line-strong)] border-t-[color:var(--accent)]" />
+          <p className="mt-4 text-sm text-[color:var(--muted)]">Loading case…</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="workspace-shell">
@@ -172,7 +199,7 @@ export default function CaseWorkspacePage() {
                   caseId={caseId}
                   refreshToken={refreshKey}
                   onEventSelect={handleEventSelect}
-                  onParticipantSelect={setSelectedEntityId}
+                  onParticipantSelect={handleParticipantSelect}
                 />
               </section>
               <section className="workspace-card-strong min-h-[320px] overflow-hidden rounded-[24px]">
@@ -204,6 +231,14 @@ export default function CaseWorkspacePage() {
           )}
         </div>
       </div>
+      <EntityProfileDrawer
+        caseId={caseId}
+        entityId={drawerEntityId}
+        refreshToken={refreshKey}
+        onClose={() => setDrawerEntityId(null)}
+        onJumpToProvenance={handleClaimSelect}
+        onEntityNavigate={handleDrawerEntityNavigate}
+      />
     </main>
   );
 }

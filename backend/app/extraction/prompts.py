@@ -20,7 +20,10 @@ chunk that supports it — so a human can audit the extraction.
 EXTRACTION PRINCIPLES
 
 1. Be conservative. Only extract what is *explicitly* stated or is a near-verbatim paraphrase.
-   Do not infer beyond the text. If unsure, don't extract.
+   Do not infer beyond the text. If unsure, don't extract. Do NOT emit the same real-world
+   entity more than once within a chunk (one record per distinct person/org/date/amount), and
+   do not extract generic, unnamed references ("the company", "the transfer", "a meeting") as
+   entities — only concrete, named ones.
 
 2. Every entity, relation, claim, and event MUST include provenance with char_start and
    char_end offsets into the CHUNK (not the full document). The substring chunk_text[char_start:char_end]
@@ -50,6 +53,13 @@ EXTRACTION PRINCIPLES
    - "attended_meeting_on" (value = ISO date)
    - "party_to_agreement_with" (value = counterparty canonical name)
    - "signed_document" (value = document name)
+
+   Attendance is a special case that drives contradiction detection. Whenever a source states
+   whether a person was at a meeting/event, ALSO emit a claim with predicate "attended_meeting"
+   and value exactly "present" or "absent" (value_type "text"). This includes negative
+   statements: "Bob Smith was not present", "did not attend", "was out of the office" →
+   attended_meeting = "absent". A statement that someone attended → attended_meeting = "present".
+   Do NOT record a person's attended_meeting_on date from a source that says they were absent.
 
    The `speaker_entity_id` should be set when the claim is attributable to a specific speaker
    (deposition witness, email author, memo signer). Leave null if unattributed.

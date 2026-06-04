@@ -38,13 +38,18 @@ def test_eval_demo_case() -> None:
 
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(
-            "SELECT id, subject_entity_id, predicate FROM contradictions WHERE case_id = 'demo'"
+            "SELECT id, subject_entity_id, subject_label, predicate "
+            "FROM contradictions WHERE case_id = 'demo'"
         )
         predicted_contradictions = [dict(r) for r in cur.fetchall()]
 
     # --- Score ---
     entity_prf = score_entity_extraction(predicted_entities, truth["entities"])
     entity_name_by_id = {e["id"]: (e.get("canonical_name") or "") for e in predicted_entities}
+    # Event/meeting contradiction subjects aren't graph entities; name them from subject_label.
+    for c in predicted_contradictions:
+        if c.get("subject_label") and c["subject_entity_id"] not in entity_name_by_id:
+            entity_name_by_id[c["subject_entity_id"]] = c["subject_label"]
     contra_prf = score_contradiction_detection(
         predicted_contradictions,
         truth["contradictions"],

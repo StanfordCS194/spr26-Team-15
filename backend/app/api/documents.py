@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
+from app.config import get_settings
 from app.db import get_conn
 from app.demo_seed import DemoPipelineStats, populate_demo_case
 from app.ingestion.chunker import chunk_text
@@ -124,6 +125,25 @@ async def upload_document(
     )
 
     message = ""
+    settings = get_settings()
+    if settings.demo_offline_mode:
+        demo_stats = populate_demo_case(case_id)
+        if demo_stats is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Document uploaded, but offline demo data could not be populated.",
+            )
+        pipeline = _demo_stats_to_summary(demo_stats)
+        message = (
+            f"Uploaded {document.filename}. The workspace was populated using offline demo data "
+            "because DEMO_OFFLINE_MODE is enabled."
+        )
+        return UploadDocumentResponse(
+            document=document,
+            pipeline=pipeline,
+            message=message,
+        )
+
     try:
         stats = run_pipeline_for_case(case_id, wipe_first=True)
         pipeline = _to_pipeline_summary(stats)

@@ -148,6 +148,8 @@ ON CREATE SET
     ev.occurred_at = $occurred_at,
     ev.provenance = [$provenance_str]
 ON MATCH SET
+    ev.description = $description,
+    ev.occurred_at = $occurred_at,
     ev.provenance = CASE WHEN $provenance_str IN ev.provenance
                          THEN ev.provenance
                          ELSE ev.provenance + $provenance_str END

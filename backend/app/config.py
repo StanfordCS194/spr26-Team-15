@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     groq_api_key: str = Field(default="", alias="GROQ_API_KEY")
 
     llm_provider: str = Field(default="anthropic", alias="LLM_PROVIDER")
+    demo_offline_mode: bool = Field(default=False, alias="DEMO_OFFLINE_MODE")
 
     neo4j_uri: str = Field(default="bolt://localhost:7687", alias="NEO4J_URI")
     neo4j_user: str = Field(default="neo4j", alias="NEO4J_USER")
@@ -37,6 +38,23 @@ class Settings(BaseSettings):
     extraction_model: str = "claude-sonnet-4-6"
     resolution_model: str = "claude-haiku-4-5-20251001"
     contradiction_explanation_model: str = "claude-haiku-4-5-20251001"
+
+    # Semantic contradiction pass (additive LLM second pass; see contradictions/semantic.py).
+    # OFF by default: it makes extra LLM calls and is not needed for the deterministic baseline.
+    # Turn on in a demo .env to showcase cross-predicate / cross-value-type detection.
+    semantic_contradictions_enabled: bool = Field(
+        default=False, alias="SEMANTIC_CONTRADICTIONS_ENABLED"
+    )
+    semantic_contradictions_max_pairs: int = Field(
+        default=50, alias="SEMANTIC_CONTRADICTIONS_MAX_PAIRS"
+    )
+
+    # Max output tokens for a single extraction call. Must be large enough to hold the full
+    # JSON (entities + relations + claims + events with provenance) for one chunk — too low
+    # truncates the response mid-string and the repair loop can't recover.
+    extraction_max_output_tokens: int = Field(
+        default=8000, alias="EXTRACTION_MAX_OUTPUT_TOKENS"
+    )
 
     # Model selection — Groq (override via GROQ_EXTRACTION_MODEL)
     groq_extraction_model: str = Field(

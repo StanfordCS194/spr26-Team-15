@@ -61,12 +61,15 @@ CREATE TABLE IF NOT EXISTS contradictions (
     id TEXT PRIMARY KEY,
     case_id TEXT NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
     subject_entity_id TEXT NOT NULL,
+    subject_label TEXT NOT NULL DEFAULT '',
     predicate TEXT NOT NULL,
     conflicting_claim_ids JSONB NOT NULL,
     explanation TEXT NOT NULL,
     rank_score DOUBLE PRECISION NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- Migration for DBs created before subject_label existed.
+ALTER TABLE contradictions ADD COLUMN IF NOT EXISTS subject_label TEXT NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS idx_contradictions_case_id ON contradictions(case_id);
 
 -- Claims are persisted here (not Neo4j) because their value-comparison logic is table-shaped.
