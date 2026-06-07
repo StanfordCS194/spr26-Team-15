@@ -15,12 +15,16 @@ interface Props {
   caseId: string;
   refreshToken?: number;
   onClaimSelect: (docId: string, start: number, end: number) => void;
+  focusSearch?: string;
+  focusSearchToken?: number;
 }
 
 export function ContradictionsPanel({
   caseId,
   refreshToken = 0,
   onClaimSelect,
+  focusSearch = "",
+  focusSearchToken = 0,
 }: Props) {
   const [contradictions, setContradictions] = useState<ContradictionDetail[]>([]);
   const [docNames, setDocNames] = useState<Record<string, string>>({});
@@ -52,6 +56,10 @@ export function ContradictionsPanel({
       cancelled = true;
     };
   }, [caseId, refreshToken]);
+
+  useEffect(() => {
+    setSearch(focusSearch);
+  }, [focusSearch, focusSearchToken]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();

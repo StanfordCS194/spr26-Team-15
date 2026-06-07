@@ -29,6 +29,8 @@ export default function CaseWorkspacePage() {
     end: number;
   } | null>(null);
   const [preferredDocId, setPreferredDocId] = useState<string | null>(null);
+  const [contradictionSearch, setContradictionSearch] = useState("");
+  const [contradictionSearchKey, setContradictionSearchKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -127,6 +129,12 @@ export default function CaseWorkspacePage() {
     setHighlight(null);
   }, []);
 
+  const handleConflictFocus = useCallback((participantName: string) => {
+    setContradictionSearch(participantName);
+    setContradictionSearchKey((current) => current + 1);
+    setTab("contradictions");
+  }, []);
+
   if (loading && !summary && !error) {
     return (
       <main className="workspace-shell">
@@ -201,6 +209,7 @@ export default function CaseWorkspacePage() {
                   refreshToken={refreshKey}
                   onEventSelect={handleEventSelect}
                   onParticipantSelect={handleParticipantSelect}
+                  onConflictFocus={handleConflictFocus}
                 />
               </section>
               <section className="workspace-card-strong h-[600px] overflow-hidden rounded-[24px]">
@@ -227,6 +236,8 @@ export default function CaseWorkspacePage() {
                 caseId={caseId}
                 refreshToken={refreshKey}
                 onClaimSelect={handleClaimSelect}
+                focusSearch={contradictionSearch}
+                focusSearchToken={contradictionSearchKey}
               />
             </section>
           )}
