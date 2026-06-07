@@ -121,34 +121,6 @@ def create_case(body: CreateCaseRequest) -> CaseSummary:
     )
 
 
-@router.get("", response_model=list[CaseSummary])
-def list_cases() -> list[CaseSummary]:
-    with get_conn() as conn, conn.cursor() as cur:
-        cur.execute(
-            "SELECT c.id, c.name, "
-            "COUNT(DISTINCT d.id) AS document_count, "
-            "COUNT(DISTINCT ct.id) AS contradiction_count "
-            "FROM cases c "
-            "LEFT JOIN documents d ON d.case_id = c.id "
-            "LEFT JOIN contradictions ct ON ct.case_id = c.id "
-            "GROUP BY c.id, c.name, c.created_at "
-            "ORDER BY c.created_at DESC"
-        )
-        rows = cur.fetchall()
-
-    entity_counts = _load_entity_counts_for_cases([row["id"] for row in rows])
-    return [
-        CaseSummary(
-            id=row["id"],
-            name=row["name"],
-            document_count=row["document_count"],
-            entity_count=entity_counts.get(row["id"], 0),
-            contradiction_count=row["contradiction_count"],
-        )
-        for row in rows
-    ]
-
-
 @router.get("/{case_id}", response_model=CaseSummary)
 def get_case(case_id: str) -> CaseSummary:
     with get_conn() as conn, conn.cursor() as cur:
