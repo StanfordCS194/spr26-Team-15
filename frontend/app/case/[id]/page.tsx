@@ -8,6 +8,7 @@ import type { CaseSummary, GraphEntity } from "@/lib/types";
 import { ContradictionsPanel } from "@/components/contradictions/ContradictionsPanel";
 import { DocPane } from "@/components/document/DocPane";
 import { EntityProfileDrawer } from "@/components/entity/EntityProfileDrawer";
+import { ExportReportButton } from "@/components/export/ExportReportButton";
 import { GraphView } from "@/components/graph/GraphView";
 import { Timeline } from "@/components/timeline/Timeline";
 import { UploadPanel } from "@/components/upload/UploadPanel";
