@@ -15,12 +15,18 @@ interface Props {
   caseId: string;
   refreshToken?: number;
   onClaimSelect: (docId: string, start: number, end: number) => void;
+  onAnnotateContradiction?: (contradiction: {
+    id: string;
+    label: string;
+    suggestedTag: string;
+  }) => void;
 }
 
 export function ContradictionsPanel({
   caseId,
   refreshToken = 0,
   onClaimSelect,
+  onAnnotateContradiction,
 }: Props) {
   const [contradictions, setContradictions] = useState<ContradictionDetail[]>([]);
   const [docNames, setDocNames] = useState<Record<string, string>>({});
@@ -172,6 +178,21 @@ export function ContradictionsPanel({
                       {c.explanation}
                     </p>
                   )}
+                  <div className="mb-3 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onAnnotateContradiction?.({
+                          id: c.id,
+                          label: `${c.subject_entity_name ?? c.subject_entity_id} · ${c.predicate}`,
+                          suggestedTag: "conflict",
+                        })
+                      }
+                      className="rounded-full border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+                    >
+                      Annotate contradiction
+                    </button>
+                  </div>
                   <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                     {c.claims.map((claim) => (
                       <button
@@ -183,7 +204,7 @@ export function ContradictionsPanel({
                         className="rounded-2xl border border-[color:var(--line)] bg-white p-4 text-left shadow-sm transition hover:border-[color:var(--accent)] hover:shadow-md"
                       >
                         <div className="panel-title">
-                          {claim.speaker_entity_name ?? claim.speaker_entity_id ?? "—"} · {claim.source_doc_id.slice(0, 8)}…
+                          {claim.speaker_entity_name ?? claim.speaker_entity_id ?? "—"} · {docNames[claim.source_doc_id] ?? `${claim.source_doc_id.slice(0, 8)}…`}
                         </div>
                         <div className="mt-2 font-mono text-sm text-[color:var(--text)]">{claim.value}</div>
                         <div className="mt-3 text-sm leading-6 text-[color:var(--muted)]">

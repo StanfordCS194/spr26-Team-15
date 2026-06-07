@@ -20,6 +20,7 @@ interface Props {
   refreshToken?: number;
   onEventSelect: (event: TimelineEvent) => void;
   onParticipantSelect: (entityId: string) => void;
+  onAnnotateEvent?: (event: { id: string; description: string; occurred_at: string }) => void;
 }
 
 export function Timeline({
@@ -27,6 +28,7 @@ export function Timeline({
   refreshToken = 0,
   onEventSelect,
   onParticipantSelect,
+  onAnnotateEvent,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const timelineRef = useRef<VisTimeline | null>(null);
@@ -239,6 +241,19 @@ export function Timeline({
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onAnnotateEvent?.({
+                            id: event.id,
+                            description: event.description,
+                            occurred_at: event.occurred_at,
+                          })
+                        }
+                        className="rounded-full border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+                      >
+                        Annotate event
+                      </button>
                       {event.participants.map((participant) => (
                         <button
                           key={participant.id}

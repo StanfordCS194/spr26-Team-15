@@ -17,6 +17,7 @@ interface Props {
   preferredDocId?: string | null;
   refreshToken?: number;
   onManualSelect?: () => void;
+  onAnnotateDocument?: (document: { id: string; filename: string }) => void;
 }
 
 export function DocPane({
@@ -25,6 +26,7 @@ export function DocPane({
   preferredDocId = null,
   refreshToken = 0,
   onManualSelect,
+  onAnnotateDocument,
 }: Props) {
   const [docs, setDocs] = useState<DocumentSummary[]>([]);
   const [activeDoc, setActiveDoc] = useState<DocumentDetail | null>(null);
@@ -117,7 +119,19 @@ export function DocPane({
             </div>
           </div>
           <div className="max-w-xs text-xs leading-5 text-[color:var(--muted)]">
-            Highlighted text shows the span used to support the selected event or contradiction.
+            <div>Highlighted text shows the span used to support the selected event or contradiction.</div>
+            <button
+              type="button"
+              onClick={() =>
+                onAnnotateDocument?.({
+                  id: activeDoc.id,
+                  filename: activeDoc.filename,
+                })
+              }
+              className="mt-3 rounded-full border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+            >
+              Add note
+            </button>
           </div>
         </div>
       </div>
