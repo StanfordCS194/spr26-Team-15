@@ -63,6 +63,7 @@ describe("formatCaseReport", () => {
               claim_id: "claim-1",
               value: "CFO",
               speaker_entity_id: null,
+              speaker_entity_name: null,
               source_doc_id: "doc-1",
               chunk_id: "chunk-1",
               char_start: 10,
