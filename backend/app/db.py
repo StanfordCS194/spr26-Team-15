@@ -88,6 +88,23 @@ CREATE TABLE IF NOT EXISTS claims (
     confidence DOUBLE PRECISION NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_claims_case_subject_predicate ON claims(case_id, subject_entity_id, predicate);
+
+CREATE TABLE IF NOT EXISTS annotations (
+    id TEXT PRIMARY KEY,
+    case_id TEXT NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    target_type TEXT NOT NULL CHECK (target_type IN ('case', 'document', 'contradiction', 'event')),
+    target_id TEXT NOT NULL,
+    target_label TEXT NOT NULL,
+    tag TEXT NOT NULL DEFAULT '',
+    title TEXT NOT NULL DEFAULT '',
+    body TEXT NOT NULL,
+    author TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_annotations_case_id_created_at
+    ON annotations(case_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_annotations_case_target
+    ON annotations(case_id, target_type, target_id);
 """
 
 

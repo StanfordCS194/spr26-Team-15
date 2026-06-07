@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import cases, contradictions, documents, graph
+from app.api import annotations, cases, contradictions, documents, graph
 from app.config import get_settings
 from app.db import init_schema
 
@@ -39,6 +39,7 @@ def create_app() -> FastAPI:
     app.include_router(documents.router, prefix="/cases", tags=["documents"])
     app.include_router(graph.router, prefix="/cases", tags=["graph"])
     app.include_router(contradictions.router, prefix="/cases", tags=["contradictions"])
+    app.include_router(annotations.router, prefix="/cases", tags=["annotations"])
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
