@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Query
@@ -57,8 +57,8 @@ class DeleteAnnotationResponse(BaseModel):
 @router.get("/{case_id}/annotations", response_model=list[AnnotationRecord])
 def list_annotations(
     case_id: str,
-    target_type: AnnotationTargetType | None = Query(default=None),
-    target_id: str | None = Query(default=None),
+    target_type: Annotated[AnnotationTargetType | None, Query()] = None,
+    target_id: Annotated[str | None, Query()] = None,
 ) -> list[AnnotationRecord]:
     query = (
         "SELECT id, case_id, target_type, target_id, target_label, tag, title, body, author, "
