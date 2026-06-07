@@ -39,15 +39,17 @@ export async function getGraph(caseId: string): Promise<GraphResponse> {
   return fetchJson<GraphResponse>(`/cases/${encodeURIComponent(caseId)}/graph`);
 }
 
-export async function getEvents(caseId: string) {
-  return fetchJson<Array<{
-    id: string;
-    description: string;
-    occurred_at: string;
-    participant_ids: string[];
-    participants: Array<{ id: string; name: string }>;
-    provenance: string[];
-  }>>(`/cases/${encodeURIComponent(caseId)}/events`);
+export interface TimelineEventRecord {
+  id: string;
+  description: string;
+  occurred_at: string;
+  participant_ids: string[];
+  participants: Array<{ id: string; name: string }>;
+  provenance: string[];
+}
+
+export async function getEvents(caseId: string): Promise<TimelineEventRecord[]> {
+  return fetchJson<TimelineEventRecord[]>(`/cases/${encodeURIComponent(caseId)}/events`);
 }
 
 export async function listDocuments(caseId: string): Promise<DocumentSummary[]> {
