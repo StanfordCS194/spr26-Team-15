@@ -6,20 +6,21 @@ import { useParams } from "next/navigation";
 import { createCase, getCase, parseProvenance } from "@/lib/api";
 import type { CaseSummary, GraphEntity } from "@/lib/types";
 import { ContradictionsPanel } from "@/components/contradictions/ContradictionsPanel";
+import { CaseDashboard } from "@/components/dashboard/CaseDashboard";
 import { DocPane } from "@/components/document/DocPane";
 import { EntityProfileDrawer } from "@/components/entity/EntityProfileDrawer";
 import { GraphView } from "@/components/graph/GraphView";
 import { Timeline } from "@/components/timeline/Timeline";
 import { UploadPanel } from "@/components/upload/UploadPanel";
 
-type Tab = "workspace" | "contradictions";
+type Tab = "overview" | "workspace" | "contradictions";
 
 export default function CaseWorkspacePage() {
   const params = useParams<{ id: string }>();
   const caseId = params.id;
 
   const [summary, setSummary] = useState<CaseSummary | null>(null);
-  const [tab, setTab] = useState<Tab>("workspace");
+  const [tab, setTab] = useState<Tab>("overview");
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [drawerEntityId, setDrawerEntityId] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<{
@@ -121,6 +122,12 @@ export default function CaseWorkspacePage() {
     setRefreshKey((k) => k + 1);
   }, []);
 
+  const handleOpenDocument = useCallback((docId: string) => {
+    setPreferredDocId(docId);
+    setHighlight(null);
+    setTab("workspace");
+  }, []);
+
   const handleManualDocSelect = useCallback(() => {
     setPreferredDocId(null);
     setHighlight(null);
@@ -158,6 +165,9 @@ export default function CaseWorkspacePage() {
               </p>
             </div>
             <nav className="flex flex-wrap gap-2 text-sm">
+              <TabButton active={tab === "overview"} onClick={() => setTab("overview")}>
+                Overview
+              </TabButton>
               <TabButton active={tab === "workspace"} onClick={() => setTab("workspace")}>
                 Workspace
               </TabButton>
@@ -187,7 +197,15 @@ export default function CaseWorkspacePage() {
         )}
 
         <div className="min-h-0 flex-1 p-4 sm:p-5">
-          {tab === "workspace" ? (
+          {tab === "overview" ? (
+            <CaseDashboard
+              caseId={caseId}
+              refreshToken={refreshKey}
+              onOpenWorkspace={() => setTab("workspace")}
+              onOpenContradictions={() => setTab("contradictions")}
+              onOpenDocument={handleOpenDocument}
+            />
+          ) : tab === "workspace" ? (
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
               <section className="workspace-card-strong h-[700px] overflow-hidden rounded-[24px] xl:col-span-2">
                 <Timeline
