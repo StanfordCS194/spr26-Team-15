@@ -9,6 +9,7 @@ import { ContradictionsPanel } from "@/components/contradictions/ContradictionsP
 import { CaseDashboard } from "@/components/dashboard/CaseDashboard";
 import { DocPane } from "@/components/document/DocPane";
 import { EntityProfileDrawer } from "@/components/entity/EntityProfileDrawer";
+import { ExportReportButton } from "@/components/export/ExportReportButton";
 import { GraphView } from "@/components/graph/GraphView";
 import { Timeline } from "@/components/timeline/Timeline";
 import { UploadPanel } from "@/components/upload/UploadPanel";
@@ -29,6 +30,8 @@ export default function CaseWorkspacePage() {
     end: number;
   } | null>(null);
   const [preferredDocId, setPreferredDocId] = useState<string | null>(null);
+  const [contradictionSearch, setContradictionSearch] = useState("");
+  const [contradictionSearchKey, setContradictionSearchKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -133,6 +136,12 @@ export default function CaseWorkspacePage() {
     setHighlight(null);
   }, []);
 
+  const handleConflictFocus = useCallback((participantName: string) => {
+    setContradictionSearch(participantName);
+    setContradictionSearchKey((current) => current + 1);
+    setTab("contradictions");
+  }, []);
+
   if (loading && !summary && !error) {
     return (
       <main className="workspace-shell">
@@ -164,17 +173,22 @@ export default function CaseWorkspacePage() {
                 without leaving the case workspace.
               </p>
             </div>
-            <nav className="flex flex-wrap gap-2 text-sm">
-              <TabButton active={tab === "overview"} onClick={() => setTab("overview")}>
-                Overview
-              </TabButton>
-              <TabButton active={tab === "workspace"} onClick={() => setTab("workspace")}>
-                Workspace
-              </TabButton>
-              <TabButton active={tab === "contradictions"} onClick={() => setTab("contradictions")}>
-                Contradictions {summary ? `(${summary.contradiction_count})` : null}
-              </TabButton>
-            </nav>
+            <div className="flex flex-col gap-3 lg:items-end">
+              <div className="flex flex-wrap gap-2">
+                <ExportReportButton caseId={caseId} />
+              </div>
+              <nav className="flex flex-wrap gap-2 text-sm">
+                <TabButton active={tab === "overview"} onClick={() => setTab("overview")}>
+                  Overview
+                </TabButton>
+                <TabButton active={tab === "workspace"} onClick={() => setTab("workspace")}>
+                  Workspace
+                </TabButton>
+                <TabButton active={tab === "contradictions"} onClick={() => setTab("contradictions")}>
+                  Contradictions {summary ? `(${summary.contradiction_count})` : null}
+                </TabButton>
+              </nav>
+            </div>
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -213,6 +227,7 @@ export default function CaseWorkspacePage() {
                   refreshToken={refreshKey}
                   onEventSelect={handleEventSelect}
                   onParticipantSelect={handleParticipantSelect}
+                  onConflictFocus={handleConflictFocus}
                 />
               </section>
               <section className="workspace-card-strong h-[600px] overflow-hidden rounded-[24px]">
@@ -239,6 +254,8 @@ export default function CaseWorkspacePage() {
                 caseId={caseId}
                 refreshToken={refreshKey}
                 onClaimSelect={handleClaimSelect}
+                focusSearch={contradictionSearch}
+                focusSearchToken={contradictionSearchKey}
               />
             </section>
           )}
