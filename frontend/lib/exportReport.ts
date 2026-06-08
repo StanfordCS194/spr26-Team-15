@@ -1,16 +1,10 @@
-import type { ContradictionDetail } from "./api";
+import type { ContradictionDetail, TimelineEventRecord } from "./api";
 import type { CaseSummary, DocumentSummary } from "./types";
-
-interface TimelineEvent {
-  description: string;
-  occurred_at: string;
-  participants: Array<{ id: string; name: string }>;
-}
 
 interface FormatCaseReportInput {
   summary: CaseSummary;
   documents: DocumentSummary[];
-  events: TimelineEvent[];
+  events: TimelineEventRecord[];
   contradictions: ContradictionDetail[];
   generatedAt?: Date;
 }
@@ -48,6 +42,9 @@ export function formatCaseReport({
   generatedAt = new Date(),
 }: FormatCaseReportInput): string {
   const documentsById = new Map(documents.map((doc) => [doc.id, doc]));
+  const highlightedEvents = events.filter(
+    (event) => event.participants.length > 0 || event.provenance.length > 1,
+  );
 
   return [
     `# Case Report: ${summary.name}`,
@@ -59,6 +56,7 @@ export function formatCaseReport({
     `- Documents: ${summary.document_count}`,
     `- Entities: ${summary.entity_count}`,
     `- Contradictions: ${summary.contradiction_count}`,
+    `- Timeline Events: ${events.length}`,
     "",
     "## Documents",
     ...(documents.length > 0
@@ -68,7 +66,25 @@ export function formatCaseReport({
         )
       : ["- None"]),
     "",
-    "## Timeline",
+    "## Timeline Highlights",
+    ...(highlightedEvents.length > 0
+      ? highlightedEvents.flatMap((event, index) => {
+          const participants = event.participants.map((participant) => participant.name).join(", ");
+          const evidenceCount = event.provenance.length;
+          const lines = [
+            `${index + 1}. ${event.occurred_at || "Undated"}: ${normalizeInline(event.description)}`,
+          ];
+
+          if (participants) {
+            lines.push(`Participants: ${participants}`);
+          }
+          lines.push(`Supporting excerpts: ${evidenceCount}`);
+          lines.push("");
+          return lines;
+        })
+      : ["No timeline highlights available."]),
+    "",
+    "## Full Timeline",
     ...(events.length > 0
       ? events.flatMap((event, index) => {
           const participants = event.participants.map((participant) => participant.name).join(", ");

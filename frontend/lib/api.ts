@@ -39,15 +39,17 @@ export async function getGraph(caseId: string): Promise<GraphResponse> {
   return fetchJson<GraphResponse>(`/cases/${encodeURIComponent(caseId)}/graph`);
 }
 
-export async function getEvents(caseId: string) {
-  return fetchJson<Array<{
-    id: string;
-    description: string;
-    occurred_at: string;
-    participant_ids: string[];
-    participants: Array<{ id: string; name: string }>;
-    provenance: string[];
-  }>>(`/cases/${encodeURIComponent(caseId)}/events`);
+export interface TimelineEventRecord {
+  id: string;
+  description: string;
+  occurred_at: string;
+  participant_ids: string[];
+  participants: Array<{ id: string; name: string }>;
+  provenance: string[];
+}
+
+export async function getEvents(caseId: string): Promise<TimelineEventRecord[]> {
+  return fetchJson<TimelineEventRecord[]>(`/cases/${encodeURIComponent(caseId)}/events`);
 }
 
 export async function listDocuments(caseId: string): Promise<DocumentSummary[]> {
@@ -115,6 +117,44 @@ export async function uploadDocument(
     throw new Error(`upload failed ${res.status}: ${body}`);
   }
   return res.json();
+}
+
+// --- Witness comparison ----------------------------------------------------
+
+export interface WitnessRef {
+  id: string;
+  name: string | null;
+}
+
+export interface ClaimCell {
+  value: string;
+  source_doc_id: string;
+  chunk_id: string;
+  char_start: number;
+  char_end: number;
+}
+
+export interface ComparisonRow {
+  predicate: string;
+  subject_entity_id: string;
+  subject_label: string | null;
+  cells: Record<string, ClaimCell[]>;
+  agreement: "agreement" | "conflict" | "single_source";
+}
+
+export interface WitnessComparisonResponse {
+  witnesses: WitnessRef[];
+  rows: ComparisonRow[];
+}
+
+export async function getWitnessComparison(
+  caseId: string,
+  entityIds: string[],
+): Promise<WitnessComparisonResponse> {
+  const qs = new URLSearchParams({ entity_ids: entityIds.join(",") });
+  return fetchJson<WitnessComparisonResponse>(
+    `/cases/${encodeURIComponent(caseId)}/witness-comparison?${qs.toString()}`,
+  );
 }
 
 /** Parse a provenance string of the form "doc_id:chunk_id:start-end" into its parts. */

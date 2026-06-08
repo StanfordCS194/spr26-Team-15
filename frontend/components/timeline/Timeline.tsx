@@ -4,22 +4,24 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Timeline as VisTimeline } from "vis-timeline/standalone";
 import { DataSet } from "vis-data";
 
-import { getEvents } from "@/lib/api";
-
-interface TimelineEvent {
-  id: string;
-  description: string;
-  occurred_at: string;
-  participant_ids: string[];
-  participants: Array<{ id: string; name: string }>;
-  provenance: string[];
-}
+import {
+  getEvents,
+  listContradictions,
+  type ContradictionDetail,
+  type TimelineEventRecord,
+} from "@/lib/api";
+import {
+  buildEventConflictIndex,
+  filterTimelineEvents,
+  type TimelineFilter,
+} from "./timelineInsights";
 
 interface Props {
   caseId: string;
   refreshToken?: number;
-  onEventSelect: (event: TimelineEvent) => void;
+  onEventSelect: (event: TimelineEventRecord) => void;
   onParticipantSelect: (entityId: string) => void;
+  onConflictFocus?: (participantName: string) => void;
 }
 
 export function Timeline({
@@ -27,17 +29,20 @@ export function Timeline({
   refreshToken = 0,
   onEventSelect,
   onParticipantSelect,
+  onConflictFocus,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const timelineRef = useRef<VisTimeline | null>(null);
   const itemsRef = useRef<DataSet<{ id: string; content: string; start: string }> | null>(null);
-  const [events, setEvents] = useState<TimelineEvent[]>([]);
+  const [events, setEvents] = useState<TimelineEventRecord[]>([]);
+  const [contradictions, setContradictions] = useState<ContradictionDetail[]>([]);
   const [search, setSearch] = useState("");
+  const [timelineFilter, setTimelineFilter] = useState<TimelineFilter>("all");
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Keep the select handler reading current events without re-creating the widget.
-  const eventsRef = useRef<TimelineEvent[]>(events);
+  const eventsRef = useRef<TimelineEventRecord[]>(events);
   const onEventSelectRef = useRef(onEventSelect);
   useEffect(() => {
     eventsRef.current = events;
@@ -54,22 +59,41 @@ export function Timeline({
         }
       })
       .catch((e) => !cancelled && setError(String(e)));
+    listContradictions(caseId)
+      .then((rows) => {
+        if (!cancelled) setContradictions(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setContradictions([]);
+      });
     return () => {
       cancelled = true;
     };
   }, [caseId, refreshToken]);
 
+  const conflictIndex = useMemo(
+    () => buildEventConflictIndex(events, contradictions),
+    [events, contradictions],
+  );
+
   // Memoized so unrelated re-renders (e.g. selecting an event) don't rebuild the vis-timeline.
-  const filteredEvents = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return events;
-    return events.filter(
-      (event) =>
-        event.description.toLowerCase().includes(q) ||
-        event.occurred_at.toLowerCase().includes(q) ||
-        event.participants.some((participant) => participant.name.toLowerCase().includes(q)),
-    );
-  }, [events, search]);
+  const filteredEvents = useMemo(
+    () => filterTimelineEvents(events, search, timelineFilter, conflictIndex),
+    [events, search, timelineFilter, conflictIndex],
+  );
+
+  useEffect(() => {
+    if (filteredEvents.length === 0) {
+      setSelectedEventId(null);
+      return;
+    }
+
+    if (selectedEventId && filteredEvents.some((event) => event.id === selectedEventId)) return;
+
+    const next = filteredEvents[0];
+    setSelectedEventId(next.id);
+    onEventSelectRef.current(next);
+  }, [filteredEvents, selectedEventId]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -170,6 +194,28 @@ export function Timeline({
             </span>
           </div>
         </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {(
+            [
+              { key: "all", label: "All events" },
+              { key: "linked_conflicts", label: "Linked conflicts" },
+              { key: "multi_source", label: "Multi-source" },
+            ] as Array<{ key: TimelineFilter; label: string }>
+          ).map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTimelineFilter(key)}
+              className={
+                timelineFilter === key
+                  ? "rounded-full border border-[color:var(--text)] bg-[color:var(--text)] px-3 py-1.5 text-xs text-white"
+                  : "rounded-full border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs text-[color:var(--muted)] hover:bg-white/80"
+              }
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[330px_1fr]">
         <div className="overflow-y-auto border-b border-[color:var(--line)] bg-[#f7efe4] xl:border-b-0 xl:border-r">
@@ -179,6 +225,7 @@ export function Timeline({
             <ul className="divide-y divide-[color:var(--line)]">
               {filteredEvents.map((event) => {
                 const selected = event.id === selectedEventId;
+                const eventConflictCount = conflictIndex[event.id]?.totalLinkedContradictions ?? 0;
                 return (
                   <li key={event.id}>
                     <button
@@ -197,6 +244,30 @@ export function Timeline({
                         {formatEventDate(event.occurred_at)}
                       </div>
                       <div className="mt-2 text-sm font-medium leading-6">{event.description}</div>
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {eventConflictCount > 0 && (
+                          <span
+                            className={
+                              selected
+                                ? "rounded-full border border-white/20 px-2.5 py-1 text-[11px]"
+                                : "rounded-full border border-[#d8a36b] bg-[#fff4e6] px-2.5 py-1 text-[11px] text-[#7f4c12]"
+                            }
+                          >
+                            {eventConflictCount} linked conflict{eventConflictCount === 1 ? "" : "s"}
+                          </span>
+                        )}
+                        {event.provenance.length > 1 && (
+                          <span
+                            className={
+                              selected
+                                ? "rounded-full border border-white/20 px-2.5 py-1 text-[11px]"
+                                : "rounded-full border border-[color:var(--line)] bg-white px-2.5 py-1 text-[11px] text-[color:var(--muted)]"
+                            }
+                          >
+                            {event.provenance.length} excerpts
+                          </span>
+                        )}
+                      </div>
                       {event.participants.length > 0 && (
                         <div className="mt-3 flex flex-wrap gap-1.5">
                           {event.participants.map((participant) => (
@@ -220,36 +291,74 @@ export function Timeline({
             </ul>
           )}
         </div>
-        <div className="grid min-h-0 grid-rows-[minmax(220px,1fr)_auto]">
-          <div ref={containerRef} className="min-h-[260px] overflow-hidden px-3 py-2 sm:px-4" />
+        <div className="flex flex-col">
+          <div ref={containerRef} className="h-[420px] overflow-hidden px-3 py-2 sm:px-4" />
           <div className="border-t border-[color:var(--line)] bg-white/85 px-4 py-4">
             {selectedEventId ? (
               (() => {
                 const event = events.find((candidate) => candidate.id === selectedEventId);
                 if (!event) return null;
+                const conflictSummary = conflictIndex[event.id] ?? {
+                  totalLinkedContradictions: 0,
+                  conflictingParticipants: [],
+                };
                 return (
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                      <div className="panel-title">
-                        Selected Event
+                  <div className="space-y-4">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <div className="panel-title">Selected Event</div>
+                        <div className="mt-2 text-base font-semibold">{event.description}</div>
+                        <div className="mt-1 text-sm text-[color:var(--muted)]">
+                          {formatEventDate(event.occurred_at)}
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <span className="rounded-full border border-[color:var(--line)] bg-[color:var(--bg-soft)] px-3 py-1.5 text-xs text-[color:var(--muted)]">
+                            {event.provenance.length} supporting excerpt
+                            {event.provenance.length === 1 ? "" : "s"}
+                          </span>
+                          {conflictSummary.totalLinkedContradictions > 0 && (
+                            <span className="rounded-full border border-[#d8a36b] bg-[#fff4e6] px-3 py-1.5 text-xs text-[#7f4c12]">
+                              {conflictSummary.totalLinkedContradictions} linked contradiction
+                              {conflictSummary.totalLinkedContradictions === 1 ? "" : "s"}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="mt-2 text-base font-semibold">{event.description}</div>
-                      <div className="mt-1 text-sm text-[color:var(--muted)]">
-                        {formatEventDate(event.occurred_at)}
+                      <div className="flex flex-wrap gap-2">
+                        {event.participants.map((participant) => (
+                          <button
+                            key={participant.id}
+                            type="button"
+                            onClick={() => onParticipantSelect(participant.id)}
+                            className="rounded-full border border-[color:var(--line)] bg-[color:var(--bg-soft)] px-3 py-1.5 text-xs text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+                          >
+                            {participant.name}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {event.participants.map((participant) => (
-                        <button
-                          key={participant.id}
-                          type="button"
-                          onClick={() => onParticipantSelect(participant.id)}
-                          className="rounded-full border border-[color:var(--line)] bg-[color:var(--bg-soft)] px-3 py-1.5 text-xs text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
-                        >
-                          {participant.name}
-                        </button>
-                      ))}
-                    </div>
+                    {conflictSummary.conflictingParticipants.length > 0 && (
+                      <div className="rounded-2xl border border-[#edd2b4] bg-[#fff7ee] px-4 py-4">
+                        <div className="panel-title">Review Queue</div>
+                        <p className="mt-2 text-sm leading-6 text-[#7f4c12]">
+                          These participants also appear in ranked contradictions. Use the buttons
+                          below to pivot directly into the contradiction queue.
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {conflictSummary.conflictingParticipants.map((participant) => (
+                            <button
+                              key={participant.id}
+                              type="button"
+                              onClick={() => onConflictFocus?.(participant.name)}
+                              className="rounded-full border border-[#d8a36b] bg-white px-3 py-1.5 text-xs text-[#7f4c12] hover:bg-[#fff1df]"
+                            >
+                              {participant.name} · {participant.contradictionCount} conflict
+                              {participant.contradictionCount === 1 ? "" : "s"}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })()

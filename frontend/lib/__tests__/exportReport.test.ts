@@ -13,7 +13,7 @@ describe("createReportFilename", () => {
 });
 
 describe("formatCaseReport", () => {
-  it("includes summary, evidence, and contradiction details", () => {
+  it("includes timeline highlights and contradiction details", () => {
     const report = formatCaseReport({
       summary: {
         id: "demo",
@@ -31,23 +31,18 @@ describe("formatCaseReport", () => {
           char_length: 987,
           created_at: "2026-05-22T10:00:00Z",
         },
-        {
-          id: "doc-2",
-          case_id: "demo",
-          filename: "deposition.txt",
-          mime_type: "text/plain",
-          char_length: 654,
-          created_at: "2026-05-22T10:05:00Z",
-        },
       ],
       events: [
         {
+          id: "event-1",
           description: " Board   approves   new compensation plan ",
           occurred_at: "2001-08-14",
+          participant_ids: ["e-1", "e-2"],
           participants: [
             { id: "e-1", name: "Kenneth Lay" },
             { id: "e-2", name: "Enron Corp." },
           ],
+          provenance: ["doc-1:chunk-1:10-22", "doc-1:chunk-2:40-58"],
         },
       ],
       contradictions: [
@@ -77,13 +72,11 @@ describe("formatCaseReport", () => {
     });
 
     expect(report).toContain("# Case Report: Enron Demo");
-    expect(report).toContain("Generated:");
-    expect(report).toContain("Case ID: demo");
-    expect(report).toContain("- memo.txt (text/plain, 987 chars)");
-    expect(report).toContain("1. 2001-08-14: Board approves new compensation plan");
+    expect(report).toContain("## Timeline Highlights");
+    expect(report).toContain("Supporting excerpts: 2");
+    expect(report).toContain("## Full Timeline");
     expect(report).toContain("Participants: Kenneth Lay, Enron Corp.");
     expect(report).toContain("### 1. Andrew Fastow · role");
-    expect(report).toContain("Rank score: 0.91");
     expect(report).toContain('- CFO | memo.txt | chars 10-22 | Excerpt: "Fastow served as CFO."');
   });
 
@@ -102,7 +95,8 @@ describe("formatCaseReport", () => {
     });
 
     expect(report).toContain("## Documents\n- None");
-    expect(report).toContain("## Timeline\nNo events available.");
+    expect(report).toContain("## Timeline Highlights\nNo timeline highlights available.");
+    expect(report).toContain("## Full Timeline\nNo events available.");
     expect(report).toContain("## Contradictions\nNo contradictions detected.");
   });
 });
