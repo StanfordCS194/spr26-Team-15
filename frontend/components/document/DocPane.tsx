@@ -20,6 +20,8 @@ interface Props {
   onAnnotateDocument?: (document: { id: string; filename: string }) => void;
 }
 
+// Source evidence panel: filename list on the left, doc text on the right.
+// Replaced the old dropdown so all docs are always visible.
 export function DocPane({
   caseId,
   highlight,
@@ -60,94 +62,154 @@ export function DocPane({
 
   useEffect(() => {
     if (!activeDocId) return;
+    let cancelled = false;
     setError(null);
     getDocument(caseId, activeDocId)
-      .then(setActiveDoc)
-      .catch((e) => setError(String(e)));
+      .then((doc) => {
+        if (!cancelled) setActiveDoc(doc);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        const msg = String(e);
+        // 404 = doc was removed. Just clear it instead of showing an error.
+        if (msg.includes("404")) {
+          setActiveDoc(null);
+          setActiveDocId(null);
+          return;
+        }
+        setError(msg);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [caseId, activeDocId]);
 
   if (error) return <div className="p-5 text-sm text-red-600">Document error: {error}</div>;
-  if (!activeDoc)
-    return (
-      <div className="flex h-full flex-col justify-between p-5">
-        <div>
-          <div className="panel-title">Source Document</div>
-          <h2 className="mt-2 text-lg font-semibold">No document selected</h2>
-          <p className="mt-2 max-w-md text-sm leading-6 text-[color:var(--muted)]">
-            Pick an event from the timeline, open a contradiction, or choose a file from the document
-            list to inspect the original evidence.
-          </p>
-        </div>
-      </div>
-    );
-
-  const text = activeDoc.text;
-  const [hlStart, hlEnd] = highlight && highlight.docId === activeDoc.id && highlight.end > highlight.start
-    ? [Math.max(0, highlight.start), Math.min(text.length, highlight.end)]
-    : [-1, -1];
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-[color:var(--line)] bg-white/80 px-4 py-3">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0 flex-1">
-            <div className="panel-title">Source Evidence</div>
-            <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
-              <label className="min-w-0">
-                <span className="sr-only">Choose source document</span>
-                <select
-                  value={activeDoc.id}
-                  onChange={(e) => {
-                    setActiveDocId(e.target.value);
-                    onManualSelect?.();
-                  }}
-                  className="w-full rounded-xl border border-[color:var(--line)] bg-white px-3 py-2 text-sm"
-                >
-                  {docs.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.filename}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <span className="rounded-full border border-[color:var(--line)] bg-[color:var(--bg-soft)] px-3 py-1 text-xs text-[color:var(--muted)]">
-                {docs.length} docs
-              </span>
-              <span className="rounded-full border border-[color:var(--line)] bg-[color:var(--bg-soft)] px-3 py-1 text-xs text-[color:var(--muted)]">
-                {activeDoc.char_length} chars
-              </span>
+    <div className="grid h-full min-h-0 grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)]">
+      <DocumentList
+        docs={docs}
+        activeDocId={activeDoc?.id ?? null}
+        onSelect={(id) => {
+          setActiveDocId(id);
+          onManualSelect?.();
+        }}
+      />
+      <div className="flex min-h-0 flex-col">
+        {!activeDoc ? (
+          <div className="flex h-full flex-col justify-between p-5">
+            <div>
+              <div className="panel-title">Source Document</div>
+              <h2 className="mt-2 text-lg font-semibold">No document selected</h2>
+              <p className="mt-2 max-w-md text-sm leading-6 text-[color:var(--muted)]">
+                Pick a document from the list on the left, or jump in via the timeline or a
+                contradiction to land on the supporting evidence.
+              </p>
             </div>
           </div>
-          <div className="max-w-xs text-xs leading-5 text-[color:var(--muted)]">
-            <div>Highlighted text shows the span used to support the selected event or contradiction.</div>
-            <button
-              type="button"
-              onClick={() =>
-                onAnnotateDocument?.({
-                  id: activeDoc.id,
-                  filename: activeDoc.filename,
-                })
-              }
-              className="mt-3 rounded-full border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
-            >
-              Add note
-            </button>
-          </div>
-        </div>
-      </div>
-      <pre className="flex-1 overflow-auto whitespace-pre-wrap bg-[linear-gradient(180deg,rgba(255,253,250,0.92),rgba(249,244,238,0.86))] p-5 font-mono text-[14px] leading-7 text-[color:var(--text)]">
-        {hlStart < 0 ? (
-          text
         ) : (
           <>
-            {text.slice(0, hlStart)}
-            <mark className="rounded-lg bg-[color:var(--accent-soft)] px-1 py-0.5 text-[color:var(--text)]">
-              {text.slice(hlStart, hlEnd)}
-            </mark>
-            {text.slice(hlEnd)}
+            <div className="border-b border-[color:var(--line)] bg-white/80 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="min-w-0 flex-1 truncate text-sm font-semibold">
+                  {activeDoc.filename}
+                </div>
+                <span className="rounded-full border border-[color:var(--line)] bg-[color:var(--bg-soft)] px-3 py-1 text-xs text-[color:var(--muted)]">
+                  {activeDoc.char_length} chars
+                </span>
+                {onAnnotateDocument ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onAnnotateDocument({
+                        id: activeDoc.id,
+                        filename: activeDoc.filename,
+                      })
+                    }
+                    className="rounded-full border border-[color:var(--line)] bg-white px-3 py-1 text-xs text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+                  >
+                    Add note
+                  </button>
+                ) : null}
+              </div>
+              <div className="mt-1 text-[11px] text-[color:var(--muted)]">
+                Highlighted text supports the selected event or contradiction.
+              </div>
+            </div>
+            <pre className="flex-1 overflow-auto whitespace-pre-wrap bg-[linear-gradient(180deg,rgba(255,253,250,0.92),rgba(249,244,238,0.86))] p-5 font-mono text-[14px] leading-7 text-[color:var(--text)]">
+              {renderHighlighted(activeDoc.text, highlight, activeDoc.id)}
+            </pre>
           </>
         )}
-      </pre>
+      </div>
     </div>
+  );
+}
+
+// Left-side list of every doc in the case. Click one to open it on the right.
+function DocumentList({
+  docs,
+  activeDocId,
+  onSelect,
+}: {
+  docs: DocumentSummary[];
+  activeDocId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div className="flex min-h-0 flex-col border-b border-[color:var(--line)] bg-[#f7efe4] xl:border-b-0 xl:border-r">
+      <div className="border-b border-[color:var(--line)] bg-white/80 px-4 py-3">
+        <div className="panel-title">Documents ({docs.length})</div>
+      </div>
+      {docs.length === 0 ? (
+        <div className="p-4 text-xs text-[color:var(--muted)]">
+          No documents in this case yet.
+        </div>
+      ) : (
+        <ul className="flex-1 overflow-y-auto divide-y divide-[color:var(--line)]">
+          {docs.map((doc) => {
+            const active = doc.id === activeDocId;
+            return (
+              <li key={doc.id}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(doc.id)}
+                  title={doc.filename}
+                  className={
+                    active
+                      ? "block w-full truncate bg-[linear-gradient(135deg,#fff3ec,#fde6d8)] px-4 py-3 text-left text-sm font-medium text-[color:var(--text)]"
+                      : "block w-full truncate bg-white/60 px-4 py-3 text-left text-sm text-[color:var(--text)] hover:bg-white/90"
+                  }
+                >
+                  {doc.filename}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function renderHighlighted(
+  text: string,
+  highlight: Highlight | null,
+  activeDocId: string,
+): React.ReactNode {
+  if (!highlight || highlight.docId !== activeDocId || highlight.end <= highlight.start) {
+    return text;
+  }
+  const hlStart = Math.max(0, highlight.start);
+  const hlEnd = Math.min(text.length, highlight.end);
+  return (
+    <>
+      {text.slice(0, hlStart)}
+      <mark className="rounded-lg bg-[color:var(--accent-soft)] px-1 py-0.5 text-[color:var(--text)]">
+        {text.slice(hlStart, hlEnd)}
+      </mark>
+      {text.slice(hlEnd)}
+    </>
   );
 }
