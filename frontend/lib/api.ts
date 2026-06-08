@@ -119,6 +119,44 @@ export async function uploadDocument(
   return res.json();
 }
 
+// --- Witness comparison ----------------------------------------------------
+
+export interface WitnessRef {
+  id: string;
+  name: string | null;
+}
+
+export interface ClaimCell {
+  value: string;
+  source_doc_id: string;
+  chunk_id: string;
+  char_start: number;
+  char_end: number;
+}
+
+export interface ComparisonRow {
+  predicate: string;
+  subject_entity_id: string;
+  subject_label: string | null;
+  cells: Record<string, ClaimCell[]>;
+  agreement: "agreement" | "conflict" | "single_source";
+}
+
+export interface WitnessComparisonResponse {
+  witnesses: WitnessRef[];
+  rows: ComparisonRow[];
+}
+
+export async function getWitnessComparison(
+  caseId: string,
+  entityIds: string[],
+): Promise<WitnessComparisonResponse> {
+  const qs = new URLSearchParams({ entity_ids: entityIds.join(",") });
+  return fetchJson<WitnessComparisonResponse>(
+    `/cases/${encodeURIComponent(caseId)}/witness-comparison?${qs.toString()}`,
+  );
+}
+
 /** Parse a provenance string of the form "doc_id:chunk_id:start-end" into its parts. */
 export function parseProvenance(p: string):
   | { docId: string; chunkId: string; start: number; end: number }
