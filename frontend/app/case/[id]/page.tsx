@@ -12,8 +12,9 @@ import { ExportReportButton } from "@/components/export/ExportReportButton";
 import { GraphView } from "@/components/graph/GraphView";
 import { Timeline } from "@/components/timeline/Timeline";
 import { UploadPanel } from "@/components/upload/UploadPanel";
+import { WitnessComparison } from "@/components/witness-comparison/WitnessComparison";
 
-type Tab = "workspace" | "contradictions";
+type Tab = "workspace" | "compare" | "contradictions";
 
 export default function CaseWorkspacePage() {
   const params = useParams<{ id: string }>();
@@ -174,6 +175,9 @@ export default function CaseWorkspacePage() {
                 <TabButton active={tab === "workspace"} onClick={() => setTab("workspace")}>
                   Workspace
                 </TabButton>
+                <TabButton active={tab === "compare"} onClick={() => setTab("compare")}>
+                  Compare Witnesses
+                </TabButton>
                 <TabButton active={tab === "contradictions"} onClick={() => setTab("contradictions")}>
                   Contradictions {summary ? `(${summary.contradiction_count})` : null}
                 </TabButton>
@@ -201,7 +205,7 @@ export default function CaseWorkspacePage() {
         )}
 
         <div className="min-h-0 flex-1 p-4 sm:p-5">
-          {tab === "workspace" ? (
+          {tab === "workspace" && (
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
               <section className="workspace-card-strong h-[700px] overflow-hidden rounded-[24px] xl:col-span-2">
                 <Timeline
@@ -230,7 +234,17 @@ export default function CaseWorkspacePage() {
                 />
               </section>
             </div>
-          ) : (
+          )}
+          {tab === "compare" && (
+            <section className="workspace-card-strong h-[800px] overflow-hidden rounded-[24px]">
+              <WitnessComparison
+                caseId={caseId}
+                refreshToken={refreshKey}
+                onJumpToProvenance={handleClaimSelect}
+              />
+            </section>
+          )}
+          {tab === "contradictions" && (
             <section className="workspace-card-strong min-h-[600px] overflow-hidden rounded-[24px]">
               <ContradictionsPanel
                 caseId={caseId}
