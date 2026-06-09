@@ -128,6 +128,68 @@ export async function listContradictions(caseId: string): Promise<ContradictionD
   );
 }
 
+export type AnnotationTargetType = "case" | "document" | "contradiction" | "event";
+
+export interface AnnotationRecord {
+  id: string;
+  case_id: string;
+  target_type: AnnotationTargetType;
+  target_id: string;
+  target_label: string;
+  tag: string;
+  title: string;
+  body: string;
+  author: string;
+  created_at: string;
+}
+
+export interface CreateAnnotationInput {
+  target_type: AnnotationTargetType;
+  target_id: string;
+  target_label: string;
+  tag?: string;
+  title?: string;
+  body: string;
+  author: string;
+}
+
+export async function listAnnotations(
+  caseId: string,
+  filters?: {
+    targetType?: AnnotationTargetType;
+    targetId?: string;
+  },
+): Promise<AnnotationRecord[]> {
+  const params = new URLSearchParams();
+  if (filters?.targetType) params.set("target_type", filters.targetType);
+  if (filters?.targetId) params.set("target_id", filters.targetId);
+  const query = params.size > 0 ? `?${params.toString()}` : "";
+  return fetchJson<AnnotationRecord[]>(
+    `/cases/${encodeURIComponent(caseId)}/annotations${query}`,
+  );
+}
+
+export async function createAnnotation(
+  caseId: string,
+  input: CreateAnnotationInput,
+): Promise<AnnotationRecord> {
+  return fetchJson<AnnotationRecord>(`/cases/${encodeURIComponent(caseId)}/annotations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteAnnotation(
+  caseId: string,
+  annotationId: string,
+): Promise<{ ok: boolean }> {
+  return fetchJson<{ ok: boolean }>(
+    `/cases/${encodeURIComponent(caseId)}/annotations/${encodeURIComponent(annotationId)}`,
+    { method: "DELETE" },
+  );
+}
+
 export async function uploadDocument(
   caseId: string,
   file: File,

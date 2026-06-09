@@ -17,6 +17,7 @@ interface Props {
   preferredDocId?: string | null;
   refreshToken?: number;
   onManualSelect?: () => void;
+  onAnnotateDocument?: (document: { id: string; filename: string }) => void;
 }
 
 // Source evidence panel: filename list on the left, doc text on the right.
@@ -27,6 +28,7 @@ export function DocPane({
   preferredDocId = null,
   refreshToken = 0,
   onManualSelect,
+  onAnnotateDocument,
 }: Props) {
   const [docs, setDocs] = useState<DocumentSummary[]>([]);
   const [activeDoc, setActiveDoc] = useState<DocumentDetail | null>(null);
@@ -116,6 +118,20 @@ export function DocPane({
                 <span className="rounded-full border border-[color:var(--line)] bg-[color:var(--bg-soft)] px-3 py-1 text-xs text-[color:var(--muted)]">
                   {activeDoc.char_length} chars
                 </span>
+                {onAnnotateDocument ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onAnnotateDocument({
+                        id: activeDoc.id,
+                        filename: activeDoc.filename,
+                      })
+                    }
+                    className="rounded-full border border-[color:var(--line)] bg-white px-3 py-1 text-xs text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+                  >
+                    Add note
+                  </button>
+                ) : null}
               </div>
               <div className="mt-1 text-[11px] text-[color:var(--muted)]">
                 Highlighted text supports the selected event or contradiction.

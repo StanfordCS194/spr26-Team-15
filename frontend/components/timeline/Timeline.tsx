@@ -21,6 +21,7 @@ interface Props {
   refreshToken?: number;
   onEventSelect: (event: TimelineEventRecord) => void;
   onParticipantSelect: (entityId: string) => void;
+  onAnnotateEvent?: (event: { id: string; description: string; occurred_at: string }) => void;
   onConflictFocus?: (participantName: string) => void;
 }
 
@@ -29,6 +30,7 @@ export function Timeline({
   refreshToken = 0,
   onEventSelect,
   onParticipantSelect,
+  onAnnotateEvent,
   onConflictFocus,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -337,6 +339,23 @@ export function Timeline({
                         ))}
                       </div>
                     </div>
+                    {onAnnotateEvent && (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onAnnotateEvent({
+                              id: event.id,
+                              description: event.description,
+                              occurred_at: event.occurred_at,
+                            })
+                          }
+                          className="rounded-full border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+                        >
+                          Annotate event
+                        </button>
+                      </div>
+                    )}
                     {conflictSummary.conflictingParticipants.length > 0 && (
                       <div className="rounded-2xl border border-[#edd2b4] bg-[#fff7ee] px-4 py-4">
                         <div className="panel-title">Review Queue</div>
