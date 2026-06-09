@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
 import { createCase, getCase, parseProvenance } from "@/lib/api";
+import {
+  AnnotationsBoard,
+  type AnnotationDraftTarget,
+} from "@/components/annotations/AnnotationsBoard";
 import type { CaseSummary, GraphEntity } from "@/lib/types";
 import { ContradictionsPanel } from "@/components/contradictions/ContradictionsPanel";
 import { DocPane } from "@/components/document/DocPane";
@@ -14,7 +18,7 @@ import { Timeline } from "@/components/timeline/Timeline";
 import { UploadPanel } from "@/components/upload/UploadPanel";
 import { WitnessComparison } from "@/components/witness-comparison/WitnessComparison";
 
-type Tab = "workspace" | "compare" | "contradictions";
+type Tab = "workspace" | "compare" | "contradictions" | "annotations";
 
 export default function CaseWorkspacePage() {
   const params = useParams<{ id: string }>();
@@ -30,6 +34,7 @@ export default function CaseWorkspacePage() {
     end: number;
   } | null>(null);
   const [preferredDocId, setPreferredDocId] = useState<string | null>(null);
+  const [annotationDraft, setAnnotationDraft] = useState<AnnotationDraftTarget | null>(null);
   const [contradictionSearch, setContradictionSearch] = useState("");
   const [contradictionSearchKey, setContradictionSearchKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -130,12 +135,52 @@ export default function CaseWorkspacePage() {
     setHighlight(null);
   }, []);
 
+  const openAnnotationDraft = useCallback((draft: AnnotationDraftTarget) => {
+    setAnnotationDraft(draft);
+    setTab("annotations");
+  }, []);
+
+  const handleAnnotateDocument = useCallback(
+    (document: { id: string; filename: string }) => {
+      openAnnotationDraft({
+        targetType: "document",
+        targetId: document.id,
+        targetLabel: document.filename,
+        suggestedTag: "source",
+      });
+    },
+    [openAnnotationDraft],
+  );
+
+  const handleAnnotateContradiction = useCallback(
+    (contradiction: { id: string; label: string; suggestedTag: string }) => {
+      openAnnotationDraft({
+        targetType: "contradiction",
+        targetId: contradiction.id,
+        targetLabel: contradiction.label,
+        suggestedTag: contradiction.suggestedTag,
+      });
+    },
+    [openAnnotationDraft],
+  );
+
+  const handleAnnotateEvent = useCallback(
+    (event: { id: string; description: string; occurred_at: string }) => {
+      openAnnotationDraft({
+        targetType: "event",
+        targetId: event.id,
+        targetLabel: `${event.occurred_at} · ${event.description}`,
+        suggestedTag: "timeline",
+      });
+    },
+    [openAnnotationDraft],
+  );
+
   const handleConflictFocus = useCallback((participantName: string) => {
     setContradictionSearch(participantName);
     setContradictionSearchKey((current) => current + 1);
     setTab("contradictions");
   }, []);
-
   if (loading && !summary && !error) {
     return (
       <main className="workspace-shell">
@@ -181,6 +226,9 @@ export default function CaseWorkspacePage() {
                 <TabButton active={tab === "contradictions"} onClick={() => setTab("contradictions")}>
                   Contradictions {summary ? `(${summary.contradiction_count})` : null}
                 </TabButton>
+                <TabButton active={tab === "annotations"} onClick={() => setTab("annotations")}>
+                  Annotations
+                </TabButton>
               </nav>
             </div>
           </div>
@@ -213,6 +261,7 @@ export default function CaseWorkspacePage() {
                   refreshToken={refreshKey}
                   onEventSelect={handleEventSelect}
                   onParticipantSelect={handleParticipantSelect}
+                  onAnnotateEvent={handleAnnotateEvent}
                   onConflictFocus={handleConflictFocus}
                 />
               </section>
@@ -223,6 +272,7 @@ export default function CaseWorkspacePage() {
                   preferredDocId={preferredDocId}
                   refreshToken={refreshKey}
                   onManualSelect={handleManualDocSelect}
+                  onAnnotateDocument={handleAnnotateDocument}
                 />
               </section>
               <section className="workspace-card-strong h-[800px] overflow-hidden rounded-[24px]">
@@ -250,10 +300,19 @@ export default function CaseWorkspacePage() {
                 caseId={caseId}
                 refreshToken={refreshKey}
                 onClaimSelect={handleClaimSelect}
+                onAnnotateContradiction={handleAnnotateContradiction}
                 focusSearch={contradictionSearch}
                 focusSearchToken={contradictionSearchKey}
               />
             </section>
+          )}
+          {tab === "annotations" && (
+            <AnnotationsBoard
+              caseId={caseId}
+              caseLabel={summary?.name ?? `Case ${caseId}`}
+              draftTarget={annotationDraft}
+              refreshToken={refreshKey}
+            />
           )}
         </div>
       </div>
