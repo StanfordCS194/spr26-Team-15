@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { getCaseDashboard, type CaseDashboard as CaseDashboardData } from "@/lib/api";
+import { formatCaseDate } from "@/lib/date";
 
 interface Props {
   caseId: string;
@@ -335,9 +336,7 @@ function EmptyState({ copy }: { copy: string }) {
 }
 
 function formatDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
+  return formatCaseDate(value);
 }
 
 function formatDateRange(start: string | null, end: string | null): string {
