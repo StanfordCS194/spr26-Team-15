@@ -5,10 +5,17 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   createAnnotation,
   deleteAnnotation,
+  getEvents,
   listAnnotations,
+  listContradictions,
+  listDocuments,
+  parseProvenance,
+  type ContradictionDetail,
   type AnnotationRecord,
   type AnnotationTargetType,
+  type TimelineEventRecord,
 } from "@/lib/api";
+import type { DocumentSummary } from "@/lib/types";
 
 const AUTHOR_STORAGE_KEY = "annotation-author";
 
@@ -27,6 +34,8 @@ interface Props {
   caseLabel: string;
   draftTarget: AnnotationDraftTarget | null;
   refreshToken?: number;
+  onOpenDocument?: (docId: string) => void;
+  onOpenEvidence?: (docId: string, start: number, end: number) => void;
 }
 
 interface FormState {
@@ -39,13 +48,28 @@ interface FormState {
   body: string;
 }
 
+interface EvidenceLink {
+  id: string;
+  docId: string;
+  filename: string;
+  label: string;
+  detail: string;
+  start: number | null;
+  end: number | null;
+}
+
 export function AnnotationsBoard({
   caseId,
   caseLabel,
   draftTarget,
   refreshToken = 0,
+  onOpenDocument,
+  onOpenEvidence,
 }: Props) {
   const [annotations, setAnnotations] = useState<AnnotationRecord[]>([]);
+  const [documents, setDocuments] = useState<DocumentSummary[]>([]);
+  const [events, setEvents] = useState<TimelineEventRecord[]>([]);
+  const [contradictions, setContradictions] = useState<ContradictionDetail[]>([]);
   const [filter, setFilter] = useState<AnnotationFilter>("all");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -84,9 +108,18 @@ export function AnnotationsBoard({
     setLoading(true);
     setError(null);
 
-    listAnnotations(caseId)
-      .then((rows) => {
-        if (!cancelled) setAnnotations(rows);
+    Promise.all([
+      listAnnotations(caseId),
+      listDocuments(caseId).catch(() => [] as DocumentSummary[]),
+      getEvents(caseId).catch(() => [] as TimelineEventRecord[]),
+      listContradictions(caseId).catch(() => [] as ContradictionDetail[]),
+    ])
+      .then(([rows, docs, eventRows, contradictionRows]) => {
+        if (cancelled) return;
+        setAnnotations(rows);
+        setDocuments(docs);
+        setEvents(eventRows);
+        setContradictions(contradictionRows);
       })
       .catch((e) => {
         if (!cancelled) setError(String(e));
@@ -99,6 +132,16 @@ export function AnnotationsBoard({
       cancelled = true;
     };
   }, [caseId, refreshToken]);
+
+  const documentById = useMemo(
+    () => new Map(documents.map((document) => [document.id, document])),
+    [documents],
+  );
+  const eventById = useMemo(() => new Map(events.map((event) => [event.id, event])), [events]);
+  const contradictionById = useMemo(
+    () => new Map(contradictions.map((contradiction) => [contradiction.id, contradiction])),
+    [contradictions],
+  );
 
   const visibleAnnotations = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -120,6 +163,15 @@ export function AnnotationsBoard({
       return haystack.includes(query);
     });
   }, [annotations, filter, search]);
+
+  const draftEvidence = useMemo(() => {
+    const target = draftTarget ?? createCaseDraft(caseId, caseLabel);
+    return resolveEvidenceLinks(target.targetType, target.targetId, {
+      documentById,
+      eventById,
+      contradictionById,
+    });
+  }, [caseId, caseLabel, contradictionById, documentById, draftTarget, eventById]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -227,6 +279,24 @@ export function AnnotationsBoard({
                 </button>
               )}
             </div>
+            {draftEvidence.length > 0 && (
+              <div className="mt-4 rounded-2xl border border-[color:var(--line)] bg-white/80 p-3">
+                <div className="panel-title">Source Evidence</div>
+                <p className="mt-2 text-xs leading-5 text-[color:var(--muted)]">
+                  This note will stay connected to the supporting source material below.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {draftEvidence.map((evidence) => (
+                    <EvidenceButton
+                      key={evidence.id}
+                      evidence={evidence}
+                      onOpenDocument={onOpenDocument}
+                      onOpenEvidence={onOpenEvidence}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <label className="block">
@@ -363,6 +433,15 @@ export function AnnotationsBoard({
                     <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[color:var(--text)]">
                       {annotation.body}
                     </p>
+                    <AnnotationEvidencePanel
+                      evidence={resolveEvidenceLinks(annotation.target_type, annotation.target_id, {
+                        documentById,
+                        eventById,
+                        contradictionById,
+                      })}
+                      onOpenDocument={onOpenDocument}
+                      onOpenEvidence={onOpenEvidence}
+                    />
                   </div>
                   <button
                     type="button"
@@ -378,6 +457,73 @@ export function AnnotationsBoard({
         )}
       </section>
     </div>
+  );
+}
+
+function AnnotationEvidencePanel({
+  evidence,
+  onOpenDocument,
+  onOpenEvidence,
+}: {
+  evidence: EvidenceLink[];
+  onOpenDocument?: (docId: string) => void;
+  onOpenEvidence?: (docId: string, start: number, end: number) => void;
+}) {
+  if (evidence.length === 0) return null;
+
+  return (
+    <div className="mt-4 rounded-2xl border border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255,253,250,0.95),rgba(249,244,238,0.92))] p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="panel-title">Source Evidence</div>
+          <p className="mt-1 text-xs leading-5 text-[color:var(--muted)]">
+            Open the linked source directly from this note.
+          </p>
+        </div>
+        <span className="rounded-full border border-[color:var(--line)] bg-white px-3 py-1 text-[11px] text-[color:var(--muted)]">
+          {evidence.length} source{evidence.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {evidence.map((item) => (
+          <EvidenceButton
+            key={item.id}
+            evidence={item}
+            onOpenDocument={onOpenDocument}
+            onOpenEvidence={onOpenEvidence}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EvidenceButton({
+  evidence,
+  onOpenDocument,
+  onOpenEvidence,
+}: {
+  evidence: EvidenceLink;
+  onOpenDocument?: (docId: string) => void;
+  onOpenEvidence?: (docId: string, start: number, end: number) => void;
+}) {
+  const opensExcerpt = evidence.start !== null && evidence.end !== null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (opensExcerpt && onOpenEvidence) {
+          onOpenEvidence(evidence.docId, evidence.start, evidence.end);
+          return;
+        }
+        onOpenDocument?.(evidence.docId);
+      }}
+      className="rounded-2xl border border-[color:var(--line)] bg-white px-3 py-2 text-left transition hover:border-[color:var(--accent)] hover:shadow-sm"
+    >
+      <div className="text-sm font-medium text-[color:var(--text)]">{evidence.label}</div>
+      <div className="mt-1 text-xs leading-5 text-[color:var(--muted)]">{evidence.detail}</div>
+    </button>
   );
 }
 
@@ -431,4 +577,89 @@ function formatTimestamp(value: string): string {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function resolveEvidenceLinks(
+  targetType: AnnotationTargetType,
+  targetId: string,
+  sources: {
+    documentById: Map<string, DocumentSummary>;
+    eventById: Map<string, TimelineEventRecord>;
+    contradictionById: Map<string, ContradictionDetail>;
+  },
+): EvidenceLink[] {
+  if (targetType === "document") {
+    const document = sources.documentById.get(targetId);
+    if (!document) return [];
+    return [
+      {
+        id: `document:${document.id}`,
+        docId: document.id,
+        filename: document.filename,
+        label: document.filename,
+        detail: "Open the linked source document",
+        start: null,
+        end: null,
+      },
+    ];
+  }
+
+  if (targetType === "event") {
+    const event = sources.eventById.get(targetId);
+    if (!event) return [];
+    return dedupeEvidenceLinks(
+      event.provenance
+        .map((raw, index) => {
+          const parsed = parseProvenance(raw);
+          if (!parsed) return null;
+          const document = sources.documentById.get(parsed.docId);
+          return {
+            id: `event:${targetId}:${index}`,
+            docId: parsed.docId,
+            filename: document?.filename ?? parsed.docId.slice(0, 8),
+            label: document?.filename ?? parsed.docId.slice(0, 8),
+            detail: "Timeline source excerpt",
+            start: parsed.start,
+            end: parsed.end,
+          } satisfies EvidenceLink;
+        })
+        .filter((value): value is EvidenceLink => value !== null),
+    );
+  }
+
+  if (targetType === "contradiction") {
+    const contradiction = sources.contradictionById.get(targetId);
+    if (!contradiction) return [];
+    return dedupeEvidenceLinks(
+      contradiction.claims.map((claim) => ({
+        id: `contradiction:${targetId}:${claim.claim_id}`,
+        docId: claim.source_doc_id,
+        filename:
+          claim.source_doc_filename ??
+          sources.documentById.get(claim.source_doc_id)?.filename ??
+          claim.source_doc_id.slice(0, 8),
+        label:
+          claim.source_doc_filename ??
+          sources.documentById.get(claim.source_doc_id)?.filename ??
+          claim.source_doc_id.slice(0, 8),
+        detail: `${claim.speaker_entity_name ?? claim.speaker_entity_id ?? "Unknown speaker"} · ${claim.value}`,
+        start: claim.char_start,
+        end: claim.char_end,
+      })),
+    );
+  }
+
+  return [];
+}
+
+function dedupeEvidenceLinks(evidence: EvidenceLink[]): EvidenceLink[] {
+  const seen = new Set<string>();
+  const deduped: EvidenceLink[] = [];
+  for (const item of evidence) {
+    const key = `${item.docId}:${item.start ?? "doc"}:${item.end ?? "doc"}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(item);
+  }
+  return deduped;
 }

@@ -14,6 +14,7 @@ class ClaimExcerpt(BaseModel):
     speaker_entity_id: str | None
     speaker_entity_name: str | None
     source_doc_id: str
+    source_doc_filename: str
     chunk_id: str
     char_start: int
     char_end: int
@@ -33,7 +34,7 @@ class ContradictionDetail(BaseModel):
 @router.get("/{case_id}/contradictions", response_model=list[ContradictionDetail])
 def list_contradictions(case_id: str) -> list[ContradictionDetail]:
     with get_conn() as conn, conn.cursor() as cur:
-        subject_names = _load_subject_names(case_id)
+        entity_names = _load_entity_names(case_id)
         cur.execute(
             "SELECT id, subject_entity_id, subject_label, predicate, conflicting_claim_ids, "
             "explanation, rank_score "
@@ -47,36 +48,19 @@ def list_contradictions(case_id: str) -> list[ContradictionDetail]:
             claim_ids = c["conflicting_claim_ids"]
             cur.execute(
                 "SELECT cl.id, cl.value, cl.speaker_entity_id, cl.source_doc_id, cl.chunk_id, "
-                "cl.char_start, cl.char_end, d.raw_text "
+                "cl.char_start, cl.char_end, d.filename, d.raw_text "
                 "FROM claims cl JOIN documents d ON d.id = cl.source_doc_id "
                 "WHERE cl.id = ANY(%s::text[])",
                 (list(claim_ids),),
             )
             rows = cur.fetchall()
-            excerpts = [
-                ClaimExcerpt(
-                    claim_id=r["id"],
-                    value=r["value"],
-                    speaker_entity_id=r["speaker_entity_id"],
-                    speaker_entity_name=subject_names.get(r["speaker_entity_id"])
-                    if r["speaker_entity_id"]
-                    else None,
-                    source_doc_id=r["source_doc_id"],
-                    chunk_id=r["chunk_id"],
-                    char_start=r["char_start"],
-                    char_end=r["char_end"],
-                    excerpt=r["raw_text"][
-                        max(0, r["char_start"] - 100) : r["char_end"] + 100
-                    ],
-                )
-                for r in rows
-            ]
+            excerpts = [_to_claim_excerpt(row, entity_names) for row in rows]
             out.append(
                 ContradictionDetail(
                     id=c["id"],
                     subject_entity_id=c["subject_entity_id"],
                     subject_entity_name=(
-                        subject_names.get(c["subject_entity_id"])
+                        entity_names.get(c["subject_entity_id"])
                         or (c["subject_label"] or None)
                     ),
                     predicate=c["predicate"],
@@ -88,7 +72,22 @@ def list_contradictions(case_id: str) -> list[ContradictionDetail]:
     return out
 
 
-def _load_subject_names(case_id: str) -> dict[str, str]:
+def _to_claim_excerpt(row: dict, entity_names: dict[str, str]) -> ClaimExcerpt:
+    return ClaimExcerpt(
+        claim_id=row["id"],
+        value=row["value"],
+        speaker_entity_id=row["speaker_entity_id"],
+        speaker_entity_name=entity_names.get(row["speaker_entity_id"]),
+        source_doc_id=row["source_doc_id"],
+        source_doc_filename=row["filename"],
+        chunk_id=row["chunk_id"],
+        char_start=row["char_start"],
+        char_end=row["char_end"],
+        excerpt=row["raw_text"][max(0, row["char_start"] - 100) : row["char_end"] + 100],
+    )
+
+
+def _load_entity_names(case_id: str) -> dict[str, str]:
     try:
         from app.graph.client import get_driver
 

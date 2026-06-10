@@ -331,6 +331,8 @@ export default function CaseWorkspacePage() {
               caseLabel={summary?.name ?? `Case ${caseId}`}
               draftTarget={annotationDraft}
               refreshToken={refreshKey}
+              onOpenDocument={handleOpenDocument}
+              onOpenEvidence={handleClaimSelect}
             />
           )}
         </div>
