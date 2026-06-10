@@ -34,10 +34,12 @@ class Settings(BaseSettings):
     backend_port: int = Field(default=8000, alias="BACKEND_PORT")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
-    # Model selection — Anthropic
-    extraction_model: str = "claude-sonnet-4-6"
-    resolution_model: str = "claude-haiku-4-5-20251001"
-    contradiction_explanation_model: str = "claude-haiku-4-5-20251001"
+    # Model selection — Anthropic (override via env vars)
+    extraction_model: str = Field(default="claude-sonnet-4-6", alias="EXTRACTION_MODEL")
+    resolution_model: str = Field(default="claude-haiku-4-5-20251001", alias="RESOLUTION_MODEL")
+    contradiction_explanation_model: str = Field(
+        default="claude-haiku-4-5-20251001", alias="CONTRADICTION_EXPLANATION_MODEL"
+    )
 
     # Semantic contradiction pass (additive LLM second pass; see contradictions/semantic.py).
     # OFF by default: it makes extra LLM calls and is not needed for the deterministic baseline.

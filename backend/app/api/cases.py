@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.db import get_conn
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -47,8 +51,8 @@ def list_cases() -> list[CaseSummary]:
             for row in result:
                 if row["case_id"]:
                     entity_counts[row["case_id"]] = row["c"]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Neo4j unavailable, entity counts will be 0: %s", e)
 
     return [
         CaseSummary(
@@ -101,8 +105,8 @@ def get_case(case_id: str) -> CaseSummary:
                 cid=case_id,
             )
             entity_count = result.single()["c"]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Neo4j unavailable, entity_count will be 0: %s", e)
 
     return CaseSummary(
         id=row["id"],
