@@ -16,7 +16,9 @@ Reason:
 
 ## Pre-Demo Setup
 
-1. Confirm `backend/.env` exists and has `DEMO_OFFLINE_MODE=true`.
+1. Confirm `.env` or `backend/.env` exists.
+   The canonical `demo` case now runs offline by default even if that flag is missing, but keeping
+   `DEMO_OFFLINE_MODE=true` in local env is still a good explicit demo setting.
 2. Start infrastructure:
 
 ```bash

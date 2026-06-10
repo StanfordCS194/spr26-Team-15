@@ -25,7 +25,7 @@ export PYTHONPATH="$REPO_ROOT/backend:${PYTHONPATH:-}"
 
 python - <<PY
 import os, sys, json, pathlib
-from app.config import get_settings
+from app.config import get_settings, should_use_offline_demo_mode
 from app.db import init_schema, get_conn
 from app.demo_seed import populate_demo_case
 from app.pipeline import run_pipeline_for_case
@@ -68,7 +68,7 @@ for doc in manifest["documents"]:
 
 print(f"Ingested {ingested} documents. Running pipeline...")
 settings = get_settings()
-if settings.demo_offline_mode:
+if should_use_offline_demo_mode(CASE_ID, settings):
     stats = populate_demo_case(CASE_ID)
     if stats is None:
         raise RuntimeError("offline demo data could not be populated")
