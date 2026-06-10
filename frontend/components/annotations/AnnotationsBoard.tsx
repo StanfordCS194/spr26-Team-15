@@ -514,7 +514,7 @@ function EvidenceButton({
       type="button"
       onClick={() => {
         if (opensExcerpt && onOpenEvidence) {
-          onOpenEvidence(evidence.docId, evidence.start, evidence.end);
+          onOpenEvidence(evidence.docId, evidence.start!, evidence.end!);
           return;
         }
         onOpenDocument?.(evidence.docId);
@@ -623,7 +623,7 @@ function resolveEvidenceLinks(
             end: parsed.end,
           } satisfies EvidenceLink;
         })
-        .filter((value): value is EvidenceLink => value !== null),
+        .filter((value): value is NonNullable<typeof value> => value !== null),
     );
   }
 
