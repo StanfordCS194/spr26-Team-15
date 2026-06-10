@@ -67,3 +67,19 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
+
+
+def should_use_offline_demo_mode(
+    case_id: str,
+    settings: Settings | None = None,
+) -> bool:
+    """Treat the canonical midpoint demo case as offline by default.
+
+    The class demo path uses case id "demo". That workflow should stay stable even when
+    a teammate's local `.env` is stale or contains placeholder provider keys.
+    """
+    normalized_case_id = case_id.strip().lower()
+    if normalized_case_id == "demo":
+        return True
+    active_settings = settings or get_settings()
+    return active_settings.demo_offline_mode

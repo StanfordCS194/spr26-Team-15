@@ -60,6 +60,7 @@ describe("formatCaseReport", () => {
               speaker_entity_id: null,
               speaker_entity_name: null,
               source_doc_id: "doc-1",
+              source_doc_filename: "memo.txt",
               chunk_id: "chunk-1",
               char_start: 10,
               char_end: 22,

@@ -30,7 +30,8 @@ See `backend/` and `frontend/` for service-specific READMEs.
 ### 2. Environment
 ```bash
 cp .env.example .env
-# Fill in ANTHROPIC_API_KEY (never commit .env)
+# For midpoint demo use, the canonical `demo` case now runs in offline mode by default.
+# Fill in provider keys only if you want live extraction on non-demo cases.
 ```
 
 ### 3. Bring up databases

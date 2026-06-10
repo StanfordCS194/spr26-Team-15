@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Timeline as VisTimeline } from "vis-timeline/standalone";
 import { DataSet } from "vis-data";
 
+import { formatCaseDate, parseCaseDate } from "@/lib/date";
 import {
   getEvents,
   listContradictions,
@@ -35,7 +36,7 @@ export function Timeline({
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const timelineRef = useRef<VisTimeline | null>(null);
-  const itemsRef = useRef<DataSet<{ id: string; content: string; start: string }> | null>(null);
+  const itemsRef = useRef<DataSet<{ id: string; content: string; start: Date }> | null>(null);
   const [events, setEvents] = useState<TimelineEventRecord[]>([]);
   const [contradictions, setContradictions] = useState<ContradictionDetail[]>([]);
   const [search, setSearch] = useState("");
@@ -109,7 +110,7 @@ export function Timeline({
       const data = filteredEvents.map((e) => ({
         id: e.id,
         content: e.description,
-        start: e.occurred_at,
+        start: parseCaseDate(e.occurred_at) ?? new Date(e.occurred_at),
       }));
 
       // Update the existing widget's dataset in place — no destroy/recreate, so typing in the
@@ -394,11 +395,5 @@ export function Timeline({
 }
 
 function formatEventDate(date: string): string {
-  const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) return date;
-  return parsed.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return formatCaseDate(date, "en-US");
 }
