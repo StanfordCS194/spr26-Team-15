@@ -87,19 +87,7 @@ def list_cases() -> list[CaseSummary]:
         )
         rows = cur.fetchall()
 
-    entity_counts: dict[str, int] = {}
-    try:
-        from app.graph.client import get_driver
-
-        with get_driver().session() as session:
-            result = session.run(
-                "MATCH (e:Entity) RETURN e.case_id AS case_id, count(e) AS c"
-            )
-            for row in result:
-                if row["case_id"]:
-                    entity_counts[row["case_id"]] = row["c"]
-    except Exception as e:
-        logger.warning("Neo4j unavailable, entity counts will be 0: %s", e)
+    entity_counts = _load_entity_counts_for_cases([r["id"] for r in rows])
 
     return [
         CaseSummary(
@@ -240,7 +228,8 @@ def _load_entity_counts_for_cases(case_ids: list[str]) -> dict[str, int]:
                 case_ids=case_ids,
             )
             return {row["case_id"]: row["c"] for row in result if row["case_id"]}
-    except Exception:
+    except Exception as e:
+        logger.warning("Neo4j unavailable, entity counts will be 0: %s", e)
         return {}
 
 
@@ -255,9 +244,14 @@ def _load_entity_breakdown(case_id: str) -> list[EntityTypeCount]:
                 "ORDER BY c DESC, type ASC",
                 cid=case_id,
             )
-            entity_count = result.single()["c"]
+            return [
+                EntityTypeCount(type=row["type"], count=row["c"])
+                for row in result
+                if row["type"]
+            ]
     except Exception as e:
-        logger.warning("Neo4j unavailable, entity_count will be 0: %s", e)
+        logger.warning("Neo4j unavailable, entity breakdown will be empty: %s", e)
+        return []
 
 
 def _load_subject_names(case_id: str) -> dict[str, str]:
@@ -271,7 +265,8 @@ def _load_subject_names(case_id: str) -> dict[str, str]:
                 cid=case_id,
             )
             return {row["id"]: row["name"] for row in result if row["id"] and row["name"]}
-    except Exception:
+    except Exception as e:
+        logger.warning("Neo4j unavailable, subject names will be empty: %s", e)
         return {}
 
 
