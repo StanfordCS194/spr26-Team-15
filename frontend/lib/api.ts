@@ -35,6 +35,46 @@ export async function getCase(caseId: string): Promise<CaseSummary> {
   return fetchJson<CaseSummary>(`/cases/${encodeURIComponent(caseId)}`);
 }
 
+export interface CaseDashboard {
+  summary: CaseSummary;
+  event_count: number;
+  date_range: {
+    start: string | null;
+    end: string | null;
+  };
+  entity_breakdown: Array<{
+    type: string;
+    count: number;
+  }>;
+  recent_documents: Array<{
+    id: string;
+    filename: string;
+    mime_type: string;
+    char_length: number;
+    created_at: string;
+  }>;
+  timeline_highlights: Array<{
+    id: string;
+    description: string;
+    occurred_at: string;
+    participant_count: number;
+    participants: string[];
+  }>;
+  top_contradictions: Array<{
+    id: string;
+    subject_entity_id: string;
+    subject_entity_name: string | null;
+    predicate: string;
+    explanation: string;
+    rank_score: number;
+    claim_count: number;
+  }>;
+}
+
+export async function getCaseDashboard(caseId: string): Promise<CaseDashboard> {
+  return fetchJson<CaseDashboard>(`/cases/${encodeURIComponent(caseId)}/dashboard`);
+}
+
 export async function getGraph(caseId: string): Promise<GraphResponse> {
   return fetchJson<GraphResponse>(`/cases/${encodeURIComponent(caseId)}/graph`);
 }
