@@ -18,8 +18,9 @@ import { GraphView } from "@/components/graph/GraphView";
 import { Timeline } from "@/components/timeline/Timeline";
 import { UploadPanel } from "@/components/upload/UploadPanel";
 import { WitnessComparison } from "@/components/witness-comparison/WitnessComparison";
+import { PrecedentsPanel } from "@/components/precedents/PrecedentsPanel";
 
-type Tab = "overview" | "workspace" | "compare" | "contradictions" | "annotations";
+type Tab = "overview" | "workspace" | "compare" | "contradictions" | "annotations" | "precedents";
 
 export default function CaseWorkspacePage() {
   const params = useParams<{ id: string }>();
@@ -239,6 +240,9 @@ export default function CaseWorkspacePage() {
                 <TabButton active={tab === "annotations"} onClick={() => setTab("annotations")}>
                   Annotations
                 </TabButton>
+                <TabButton active={tab === "precedents"} onClick={() => setTab("precedents")}>
+                  Precedents
+                </TabButton>
               </nav>
             </div>
           </div>
@@ -323,6 +327,11 @@ export default function CaseWorkspacePage() {
                 focusSearch={contradictionSearch}
                 focusSearchToken={contradictionSearchKey}
               />
+            </section>
+          )}
+          {tab === "precedents" && (
+            <section className="workspace-card-strong min-h-[600px] overflow-hidden rounded-[24px]">
+              <PrecedentsPanel caseId={caseId} refreshToken={refreshKey} />
             </section>
           )}
           {tab === "annotations" && (

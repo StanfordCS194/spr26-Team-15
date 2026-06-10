@@ -89,6 +89,14 @@ CREATE TABLE IF NOT EXISTS claims (
 );
 CREATE INDEX IF NOT EXISTS idx_claims_case_subject_predicate ON claims(case_id, subject_entity_id, predicate);
 
+-- Cached LLM-generated precedent suggestions; invalidated when document_count changes.
+CREATE TABLE IF NOT EXISTS precedent_cache (
+    case_id TEXT PRIMARY KEY REFERENCES cases(id) ON DELETE CASCADE,
+    document_count INTEGER NOT NULL,
+    results JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS annotations (
     id TEXT PRIMARY KEY,
     case_id TEXT NOT NULL REFERENCES cases(id) ON DELETE CASCADE,

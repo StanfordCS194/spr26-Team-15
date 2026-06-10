@@ -15,6 +15,7 @@ from app.api import (
     contradictions,
     documents,
     graph,
+    precedents,
     witness_comparison,
 )
 from app.config import get_settings
@@ -50,6 +51,7 @@ def create_app() -> FastAPI:
     app.include_router(
         witness_comparison.router, prefix="/cases", tags=["witness-comparison"]
     )
+    app.include_router(precedents.router, prefix="/cases", tags=["precedents"])
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

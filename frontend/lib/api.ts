@@ -527,6 +527,17 @@ function makeLocalId(prefix: string): string {
   return `${prefix}-${Date.now()}`;
 }
 
+export interface Precedent {
+  title: string;
+  citation: string;
+  area_of_law: string;
+  relevance: string;
+}
+
+export async function listPrecedents(caseId: string): Promise<Precedent[]> {
+  return fetchJson<Precedent[]>(`/cases/${encodeURIComponent(caseId)}/precedents`);
+}
+
 /** Parse a provenance string of the form "doc_id:chunk_id:start-end" into its parts. */
 export function parseProvenance(p: string):
   | { docId: string; chunkId: string; start: number; end: number }
